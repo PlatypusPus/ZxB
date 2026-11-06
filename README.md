@@ -36,13 +36,3 @@ Then Admin → Live → Start auction, open `/projector` on the TV and a leader 
 Auctioneer keys on the Live tab: N next, S sold, U unsold, P pause/resume.
 
 Never run `vite dev` on the VPS (CVE-2026-39363). Production serves `frontend/dist` and `uploads/public`; `uploads/private` (payment screenshots) is only served through the admin API.
-
-## Deploy (VPS: core@acrossthe.cloud, pm2 + Caddy)
-
-The app runs as one pm2 process (`zxb`, port 8030) that serves both the API and the built site. Caddy terminates HTTPS for `zxb.shov.in`.
-
-```sh
-# update a running deploy
-ssh core@acrossthe.cloud 'cd ~/shovin/zxb && git pull && (cd backend && ~/.local/bin/uv sync --no-dev --frozen) && (cd frontend && npm ci && npm run build) && pm2 restart zxb'
-```
-First-time root steps (Postgres role/db, Caddy site): `sudo bash ~/shovin/zxb/deploy/root-setup.sh`. Secrets live in `~/shovin/zxb/.env` (see `.env.example`); uploads in `~/shovin/zxb-data/uploads`.

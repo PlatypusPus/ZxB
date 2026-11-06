@@ -1,0 +1,23 @@
+# Local dev: `docker compose up -d db` then run the API with uv (see README).
+# Full stack: `docker compose up --build`. Traefik + backups get added in Phase 5a.
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+      POSTGRES_DB: zxb
+    ports: ["127.0.0.1:5440:5432"]   # localhost only; never expose in prod
+    volumes: [pgdata:/var/lib/postgresql]
+    healthcheck:
+      test: pg_isready -U postgres
+      interval: 2s
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-devpassword}@db/zxb
+      UPLOAD_DIR: /data/uploads
+    env_file: [{path: .env, required: false}]   # SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD_HASH
+    volumes: [uploads:/data/uploads]
+    depends_on: {db: {condition: service_healthy}}
+    ports: ["127.0.0.1:8010:8000"]
+volumes: {pgdata: {}, uploads: {}}

@@ -1,0 +1,9 @@
+node_modules
+dist
+.venv
+uploads
+__pycache__
+.env
+*.pyc
+uploads-demo
+.codex

@@ -1,0 +1,9 @@
+{
+  "name": "zenithxbeans",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/run.mjs dev",
+    "test": "node scripts/run.mjs test",
+    "test:full": "node scripts/run.mjs test:full"
+  }
+}

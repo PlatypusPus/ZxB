@@ -585,3 +585,32 @@ textarea:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
 .profile h1 { margin-top: 12px; }
 /* UPI QR on the payment step: uploads are often full app screenshots, so cap the size. */
 .pay-steps li > .qr { width: min(240px, 100%); height: auto; max-height: 340px; object-fit: contain; padding: 0; border-radius: 4px; }
+
+/* Projector: staged reveal and result */
+.proj-solo { position: relative; }
+.proj-stage { position: relative; width: min(46vw, 70vh); }
+.proj-card { position: relative; transition: filter .45s ease; }
+.proj-card .pcard { border-color: color-mix(in srgb, var(--band) 55%, var(--line)); }
+.phase-unsold .proj-card { filter: grayscale(1) brightness(.55); }
+.phase-paused .proj-card { filter: brightness(.4); }
+.proj-flash { position: fixed; inset: 0; background: var(--band); opacity: 0; pointer-events: none; z-index: 40; mix-blend-mode: screen; }
+.slate { position: fixed; left: 0; right: 0; top: 36vh; height: 28vh; z-index: 70; background: var(--band); color: #0b0b0d;
+  display: flex; align-items: center; justify-content: space-between; gap: 4vw; padding: 0 6vw; }
+.slate strong { font: 400 17vh/1 var(--display); text-transform: uppercase; }
+.slate-lot { font: 800 2.6vh var(--body); letter-spacing: .22em; }
+.verdict { position: absolute; inset: 0; display: grid; place-items: center; z-index: 6; pointer-events: none; }
+.verdict strong { font: 400 clamp(90px, 13vw, 240px)/.9 var(--display); color: var(--amber); border: .07em solid currentColor;
+  padding: .04em .16em 0; transform: rotate(-6deg); background: rgb(11 11 13 / .62); }
+.verdict.unsold strong { color: var(--muted); }
+.proj-paused { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; z-index: 5;
+  font: 400 clamp(64px, 9vw, 160px)/1 var(--display); color: var(--ink); letter-spacing: .04em; }
+.sold-to { display: flex; align-items: center; gap: 2vw; width: min(60vw, 900px); background: var(--card);
+  border: 2px solid var(--amber); padding: 1.6vh 2vw; animation: sold-up .45s cubic-bezier(.16, 1, .3, 1) .25s both; }
+.sold-to img { width: 10vh; height: 10vh; object-fit: cover; }
+.sold-label { display: block; font: 800 1.7vh var(--body); letter-spacing: .22em; color: var(--amber); }
+.sold-to strong { display: block; font: 400 6.5vh/1 var(--display); text-transform: uppercase; }
+.sold-to .digits { margin-left: auto; font-size: 6vh; color: var(--amber); }
+@keyframes sold-up { from { transform: translateY(40px); opacity: 0; } }
+.proj-solo .timer.hot .digits { color: var(--pink); animation: beat .5s ease-in-out infinite alternate; }
+@keyframes beat { to { transform: scale(1.14); } }
+@media (prefers-reduced-motion: reduce) { .sold-to, .proj-solo .timer.hot .digits { animation: none; } .proj-card { transition: none; } }

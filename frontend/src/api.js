@@ -29,5 +29,5 @@ export const STATUS_TEXT = {
   approved: ['Approved', "You're in. Leaders get their access link on WhatsApp; players enter the auction pool."],
   rejected: ['Rejected', 'See the reason below. Message the organisers if you think this is a mistake.'],
   waitlisted: ['Waitlisted', 'All leader slots are taken. You can switch to auction player, or wait in case a leader drops out.'],
-  withdrawn: ['Withdrawn', 'You have pulled out of the tournament. Refunds follow the refund policy.'],
+  withdrawn: ['Withdrawn', 'You have pulled out of the tournament. Entry fees are not refunded; ask the organisers about swapping your place to someone else.'],
 }

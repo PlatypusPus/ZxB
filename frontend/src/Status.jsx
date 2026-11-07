@@ -30,7 +30,7 @@ export default function Status({ token }) {
   const [title, text] = me.path === 'sub' && me.status === 'verified' ? ['In the sub pool', 'Free entry, no payment needed. Next we check your rank on tracker.gg.'] : STATUS_TEXT[me.status] || [me.status, '']
   return (
     <main className="wrap narrow">
-      <a href="/" className="mono muted">← Home</a>
+      <a href="/" className="btn ghost">← Home</a>
       <h1 className="display">Your sign-up</h1>
       <div className="card">
         <p className="mono amber">STATUS</p>

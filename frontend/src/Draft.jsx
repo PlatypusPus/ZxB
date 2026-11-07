@@ -10,7 +10,7 @@ const FAQ = [
   ['How is my rank checked?', 'We open your Riot ID on tracker.gg. If your current or peak rank does not match, your sign-up is rejected with the reason.'],
   ['Will I definitely get a team?', 'Yes. Everyone approved is placed on a team, either by auction or in the final draft round.'],
   ['Can I edit my sign-up?', 'Yes, from your edit link, until an organiser starts checking it or registration closes.'],
-  ['What happens to my ₹300 if I am rejected?', 'See the refund policy below. It is published before sign-ups open.'],
+  ['Can I get a refund?', 'No. Once you have signed up and paid, the entry is not refunded. If you can’t play, you can swap your place to someone else through the organisers. See the refund policy.'],
 ]
 
 // A scripted example lot for the "How it works" section: bids land, the timer resets, the hammer falls.

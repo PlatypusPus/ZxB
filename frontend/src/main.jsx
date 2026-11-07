@@ -7,14 +7,17 @@ import Status from './Status.jsx'
 import Admin from './Admin.jsx'
 import Projector from './Projector.jsx'
 import Leader from './Leader.jsx'
+import Policy from './Policy.jsx'
 
-// ponytail: seven routes, so a pathname switch instead of a router library.
+// ponytail: nine routes, so a pathname switch instead of a router library.
 const path = location.pathname.replace(/\/+$/, '') || '/'
 const page = path === '/draft' || path === '/auction' ? <Draft />
   : path.startsWith('/signup') ? <Signup />
   : path.startsWith('/status/') ? <Status token={decodeURIComponent(path.slice(8))} />
   : path.startsWith('/admin') ? <Admin />
   : path === '/projector' ? <Projector />
+  : path === '/refund-policy' ? <Policy kind="refund" />
+  : path === '/privacy' ? <Policy kind="privacy" />
   : path.startsWith('/leader/') ? <Leader code={decodeURIComponent(path.slice(8))} />
   : <Home />
 

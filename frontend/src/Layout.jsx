@@ -112,7 +112,7 @@ export function Footer() {
     <footer className="wrap footer" data-section>
       <div className="grid3">
         <div><a href="/" className="brand" aria-label="ZenithXBeans home"><Logo /></a><p className="muted">Community tournaments, run in the open.</p></div>
-        <div><p><strong>Refund policy</strong></p><p className="muted">Published before sign-ups open for each tournament.</p></div>
+        <div><p><strong>Policies</strong></p><div className="actions"><a className="btn ghost" href="/refund-policy">Refund policy</a><a className="btn ghost" href="/privacy">Privacy</a></div></div>
         <div><p><strong>Contact</strong></p><p className="muted">ZenithXBeans on Discord.</p></div>
       </div>
       <p className="muted small">{RIOT_NOTICE}</p>

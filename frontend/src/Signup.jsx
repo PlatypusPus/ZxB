@@ -133,15 +133,15 @@ export default function Signup() {
       </main>
     )
   }
-  if (info && !info.registration_open) return <main className="wrap narrow"><h1 className="display">Registration is closed</h1><a href="/">Back to home</a></main>
+  if (info && !info.registration_open) return <main className="wrap narrow"><h1 className="display">Registration is closed</h1><a className="btn" href="/">Back to home</a></main>
 
   const upi = `upi://pay?pa=${encodeURIComponent(info?.upi_id || '')}&pn=${encodeURIComponent(info?.upi_name || 'ZenithXBeans')}&am=${info?.fee ?? 300}&cu=INR&tn=ZXB%20signup`
   return (
     <main className="wrap signup">
       <form onSubmit={submit} noValidate className="signup-form">
-        <a href="/" className="mono muted">← {info?.name || 'Home'}</a>
+        <a href="/" className="btn ghost">← {info?.name || 'Home'}</a>
         <h1 className="display" tabIndex={-1}>Sign up</h1>
-        {already && <p className="note">You've already signed up on this device. <a href={`/status/${already}`}>Check your status</a> instead of paying twice.</p>}
+        {already && <p className="note">You've already signed up on this device. Check your status instead of paying twice. <a className="btn ghost" href={`/status/${already}`}>Check my status</a></p>}
         <ol className="steps mono" aria-label="Progress">
           {['Profile', 'Path', free ? 'Confirm' : 'Payment'].map((s, i) => <li key={s} aria-current={i === step ? 'step' : undefined} className={i <= step ? 'on' : ''}>{i + 1}. {s}</li>)}
         </ol>
@@ -210,7 +210,7 @@ export default function Signup() {
           <div className="field">
             <label className="check">
               <input id="f-terms" type="checkbox" checked={v.terms} onChange={e => set('terms', e.target.checked)} aria-describedby={errors.terms ? 'terms-e' : undefined} />
-              <span>I accept the rulebook, refund policy and privacy notice, and agree to my rank being checked on tracker.gg.</span>
+              <span>I accept the rules, the <a href="/refund-policy" target="_blank">refund policy</a> (no refunds, swaps allowed) and the <a href="/privacy" target="_blank">privacy notice</a>, and agree to my rank being checked on tracker.gg.</span>
             </label>
             {errors.terms && <p className="err" id="terms-e">{errors.terms}</p>}
           </div>

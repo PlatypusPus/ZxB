@@ -66,7 +66,7 @@ export default function Home() {
               {open !== false && <div className="actions">
                 <a className="btn" href="/signup?path=leader">Lead a team</a>
                 <a className="btn ghost" href="/signup?path=auction">Get auctioned · ₹{info?.fee ?? 300}</a>
-                <a className="hero-sub" href="/signup?path=sub">Or join the sub pool, free →</a>
+                <a className="btn ghost" href="/signup?path=sub">Sub pool · Free</a>
               </div>}
             </div>
             <aside className="hero-count" aria-label="Key dates">
@@ -129,7 +129,7 @@ export default function Home() {
               <div><dt className="mono muted">TEAMS</dt><dd>{info?.teams ?? 10}</dd></div>
               <div><dt className="mono muted">GRAND FINAL</dt><dd>22 Nov</dd></div>
             </dl>
-            <a className="auction-more" href="/draft">Full format and rules →</a>
+            <div className="actions"><a className="btn ghost" href="/draft">Full format and rules</a><a className="btn ghost" href="/refund-policy">Refund policy</a></div>
           </article>
         </section>
 

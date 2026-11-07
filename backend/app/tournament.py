@@ -35,7 +35,7 @@ DEFAULT_SETTINGS = {
 
 def settings(t: Tournament) -> dict:
     return {**DEFAULT_SETTINGS, **t.settings}
-TERMS_VERSION = "v1"
+TERMS_VERSION = "v2"  # v2: refund policy (no refunds, swaps) and privacy pages
 
 
 async def init_db() -> None:

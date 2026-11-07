@@ -16,14 +16,14 @@ function Refund({ fee }) {
     <h2>Swap your place instead</h2>
     <p>If you can't play, you can swap yourself out for someone else:</p>
     <ol>
-      <li>Message the organisers on the ZenithXBeans Discord with your Riot ID and the Riot ID of the person taking your place.</li>
+      <li>Message shanks_87 or mystic_mc on Discord with your Riot ID and the Riot ID of the person taking your place.</li>
       <li>They fill in their own player card. Their rank is checked on tracker.gg like everyone else's.</li>
       <li>Once an organiser approves the swap, your paid entry moves to them. Any arrangement between you and them about the fee is between the two of you.</li>
     </ol>
     <p>A captain who swaps out hands over the team: name, tag, logo, credits and any players already bought. Swaps aren't possible once the grand final has started.</p>
 
     <h2>Questions</h2>
-    <p>Ask an organiser on the ZenithXBeans Discord before you pay if anything here is unclear.</p>
+    <p>Ask shanks_87 or mystic_mc on Discord before you pay if anything here is unclear.</p>
   </>
 }
 
@@ -59,7 +59,7 @@ function Privacy() {
     <p>Payment decisions, bids and sales are kept in an audit log, so the auction and the money can be checked later.</p>
 
     <h2>Removing your details</h2>
-    <p>Ask an organiser on the ZenithXBeans Discord to remove your details. Payment records needed for the event's accounts are kept.</p>
+    <p>Ask shanks_87 or mystic_mc on Discord to remove your details. Payment records needed for the event's accounts are kept.</p>
   </>
 }
 

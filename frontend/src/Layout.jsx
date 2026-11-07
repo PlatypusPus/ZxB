@@ -107,13 +107,31 @@ export function SlotMeter({ info }) {
   )
 }
 
+// Discord has no public link by username, so each contact copies the username to paste into Discord's search.
+const CONTACTS = ['shanks_87', 'mystic_mc']
+
+function Contacts() {
+  const [copied, setCopied] = useState('')
+  const copy = u => navigator.clipboard?.writeText(u).then(() => { setCopied(u); setTimeout(() => setCopied(''), 1600) })
+  return (
+    <ul className="contacts">
+      {CONTACTS.map(u => (
+        <li key={u}>
+          <span className="contact-name">@{u}</span>
+          <button type="button" className="btn ghost" onClick={() => copy(u)} aria-label={`Copy Discord username ${u}`}>{copied === u ? 'Copied ✓' : 'Copy'}</button>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 export function Footer() {
   return (
     <footer className="wrap footer" data-section>
       <div className="grid3">
         <div><a href="/" className="brand" aria-label="ZenithXBeans home"><Logo /></a><p className="muted">Community Valorant tournaments.</p></div>
         <div><p><strong>Policies</strong></p><div className="actions"><a className="btn ghost" href="/refund-policy">Refund policy</a><a className="btn ghost" href="/privacy">Privacy</a></div></div>
-        <div><p><strong>Contact</strong></p><p className="muted">ZenithXBeans on Discord.</p></div>
+        <div><p><strong>Contact on Discord</strong></p><Contacts /></div>
       </div>
       <p className="muted small">{RIOT_NOTICE}</p>
     </footer>

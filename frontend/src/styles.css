@@ -573,3 +573,8 @@ textarea:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
 .follow .btn.big:disabled { cursor: not-allowed; }
 .skip { background: none; border: 0; padding: 4px 0; color: var(--muted); font: 13px var(--body); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; margin-top: -8px; }
 .skip:hover { color: var(--ink); }
+
+.contacts { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.contacts li { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--card); border: 1px solid var(--line); padding: 6px 6px 6px 14px; max-width: 320px; }
+.contact-name { font-weight: 700; overflow-wrap: anywhere; }
+.contacts .btn { min-height: 36px; padding: 6px 14px; font-size: 12px; }

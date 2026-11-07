@@ -8,7 +8,7 @@ const FAQ = [
   ['How are captains chosen?', 'Anyone can sign up as a captain. The organisers review every captain sign-up and accept one per team slot.'],
   ['Who can enter?', 'Anyone who plays the game. Each tournament page lists its entry fee, format and rules.'],
   ['How are payments checked?', 'An organiser matches your UPI transaction ID (UTR) against the bank statement. Nobody is approved before that check.'],
-  ['How do I hear about the next tournament?', 'New events are announced on the ZenithXBeans Discord first, then listed here.'],
+  ['How do I hear about the next tournament?', 'New events are announced first on Instagram at @shankssays, @whoshanks and @ttvpeachysmolbean, then listed here.'],
 ]
 
 // "22 Nov 2026" -> a big day number over the month. Anything else shows TBA.
@@ -168,7 +168,7 @@ export default function Home() {
               </a>
             </li>
           </ol>
-          <p className="events-note muted">More tournaments are announced on the ZenithXBeans Discord first, then listed here.</p>
+          <p className="events-note muted">More tournaments are announced on Instagram first, then listed here.</p>
         </section>
 
         <section className="wrap" data-section>

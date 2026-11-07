@@ -141,6 +141,8 @@ export default function Signup() {
       </main>
     )
   }
+  // Wait for the sign-in check and event info, so the form never flashes before the sign-in or follow screen.
+  if (!auth || (!info && !msg)) return <main className="wrap narrow" aria-busy="true" />
   if (info && !info.registration_open) return <main className="wrap narrow"><h1 className="display">Registration is closed</h1><a className="btn" href="/">Back to home</a></main>
   if (auth?.user && auth.user.verified === false) return <CheckEmail user={auth.user} info={info} onSignOut={signOut} onCheck={loadAuth} />
   if (auth && !auth.user) return <SignIn providers={auth.providers} error={loginError} info={info} path={v.path} onDone={loadAuth} />

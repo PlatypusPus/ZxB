@@ -157,13 +157,24 @@ async def signup(
     return {"edit_token": raw_token, "status": p.status}
 
 
-async def by_token(db: AsyncSession, token: str):
+async def find_signup(db: AsyncSession, *where, missing: str):
+    # A live sign-up wins over an older rejected or withdrawn one from the same account.
     row = (await db.execute(select(Player, Payment, Team).join(Payment, Payment.player_id == Player.id)
-                            .outerjoin(Team, Team.leader_player_id == Player.id)
-                            .where(Player.edit_token_hash == sha256(token)))).first()
+                            .outerjoin(Team, Team.leader_player_id == Player.id).where(*where)
+                            .order_by(Player.status.in_(["rejected", "withdrawn"]), Player.id.desc()).limit(1))).first()
     if not row:
-        raise HTTPException(404, "Sign-up not found. Check your edit link.")
+        raise HTTPException(404, missing)
     return row
+
+
+async def by_token(db: AsyncSession, token: str):
+    return await find_signup(db, Player.edit_token_hash == sha256(token), missing="Sign-up not found. Check your edit link.")
+
+
+async def by_account(request: Request, db: AsyncSession):
+    who = require_identity(request)
+    return await find_signup(db, Player.auth_provider == who["provider"], Player.auth_sub == who["sub"],
+                             missing="You haven't signed up with this account yet.")
 
 
 def own_view(p: Player, pay: Payment, team: Team | None, cfg: dict, editable: bool) -> dict:
@@ -178,6 +189,20 @@ def editable(p: Player, pay: Payment) -> bool:
     return pay.status == "submitted" or (p.path == "sub" and p.status == "verified")
 
 
+@router.get("/me/signup")
+async def my_profile(request: Request, db: AsyncSession = Depends(get_db)):
+    """The signed-in person's own sign-up: replaces the edit link they had to save."""
+    t, cfg = await load(db)
+    p, pay, team = await by_account(request, db)
+    return own_view(p, pay, team, cfg, registration_open(t) and editable(p, pay))
+
+
+@router.patch("/me/signup")
+async def edit_my_profile(body: dict, request: Request, db: AsyncSession = Depends(get_db)):
+    rate_limit(request, "edit", 20, 600)
+    return await apply_edit(db, *(await by_account(request, db)), body)
+
+
 @router.get("/signup/{token}")
 async def my_signup(token: str, db: AsyncSession = Depends(get_db)):
     t, cfg = await load(db)
@@ -188,8 +213,11 @@ async def my_signup(token: str, db: AsyncSession = Depends(get_db)):
 @router.patch("/signup/{token}")
 async def edit_signup(token: str, body: dict, request: Request, db: AsyncSession = Depends(get_db)):
     rate_limit(request, "edit", 20, 600)
+    return await apply_edit(db, *(await by_token(db, token)), body)
+
+
+async def apply_edit(db: AsyncSession, p: Player, pay: Payment, team: Team | None, body: dict):
     t, cfg = await load(db)
-    p, pay, team = await by_token(db, token)
     if not registration_open(t):
         raise HTTPException(403, "Registration is closed, so sign-ups can't be edited")
     if not editable(p, pay):

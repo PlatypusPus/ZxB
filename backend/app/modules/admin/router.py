@@ -120,8 +120,9 @@ async def refund_payment(payment_id: int, body: dict, db: AsyncSession = Depends
 
 async def notify(p: Player, event_name: str, subject: str, body: str, button: tuple[str, str] | None = None) -> bool:
     """Email the person at their sign-in email. Runs after the commit, so a mail failure never undoes a decision."""
-    text = f"Hi {p.display_name},\n\n{body}\n\n{event_name}\n{SITE}\n"
+    text = f"Hi {p.display_name},\n\n{body}\n\nYour profile: {SITE}/profile\n\n{event_name}\n{SITE}\n"
     paras = [f"Hi {p.display_name},", *body.split("\n\n")]
+    button = button or ("Open my profile", f"{SITE}/profile")
     if button:   # the link is the button in HTML, so drop its bare-URL paragraph
         paras = [x for x in paras if x.strip() != button[1]]
     return await asyncio.to_thread(send_mail, p.auth_email or "", f"{event_name}: {subject}", text,

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { api } from './api.js'
 
 const RIOT_NOTICE = "ZenithXBeans' tournaments aren't endorsed by Riot Games and don't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc."
 
@@ -18,6 +19,8 @@ const LINKS = [['/', 'Home'], ['/#tournaments', 'Tournaments'], ['/draft', 'Valo
 export function Nav({ info }) {
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const [user, setUser] = useState(null)
+  useEffect(() => { api('/auth/me').then(a => setUser(a.user)).catch(() => {}) }, [])
   useEffect(() => {
     const on = () => setScrolled(scrollY > 8)
     on(); addEventListener('scroll', on, { passive: true })
@@ -34,11 +37,11 @@ export function Nav({ info }) {
           {LINKS.map(([href, label]) => (
             <a key={href} href={href} aria-current={href === here ? 'page' : undefined} onClick={() => setOpen(false)}>{label}</a>
           ))}
-          <a href="/signup" className="btn nav-mobile-cta">Sign up</a>
+          <a href={user ? '/profile' : '/signup'} className="btn nav-mobile-cta">{user ? 'My profile' : 'Sign up'}</a>
         </nav>
         <div className="nav-right">
           <span className={'chip' + (live || info?.registration_open ? ' hot' : '')}><span className={'live-dot' + (live || info?.registration_open ? ' on' : '')} />{chip}</span>
-          <a href={live ? '/projector' : '/signup'} className="btn nav-cta">{live ? 'Watch live' : 'Sign up'}</a>
+          <a href={live ? '/projector' : user ? '/profile' : '/signup'} className="btn nav-cta">{live ? 'Watch live' : user ? 'My profile' : 'Sign up'}</a>
           <button className="nav-toggle" aria-expanded={open} aria-controls="nav-links" aria-label="Menu" onClick={() => setOpen(!open)}>
             <span /><span /><span />
           </button>

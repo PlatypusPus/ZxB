@@ -64,15 +64,15 @@ export default function Signup() {
   const [files, setFiles] = useState({})
   const [errors, setErrors] = useState({})
   const [step, setStep] = useState(saved.step || 0)
-  const [copied, setCopied] = useState(false)
-  const already = localStorage.getItem('zxb-edit')
   useEffect(() => { sessionStorage.setItem(DRAFT, JSON.stringify({ v, step })) }, [v, step])
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   const [done, setDone] = useState(null)
   useEffect(() => { api('/public').then(setInfo).catch(e => setMsg(e.message)) }, [])
   const [auth, setAuth] = useState(null)   // { providers, user } from the Google or email sign-in
-  const loadAuth = () => api('/auth/me').then(a => {
+  const loadAuth = () => api('/auth/me').then(async a => {
+      // Already signed up with this account? Their profile is the place to check or edit it.
+      if (a.user?.verified !== false && a.user && await api('/me/signup').then(() => true, () => false)) return location.replace('/profile')
       setAuth(a)
       if (a.user && !v.display_name) set('display_name', a.user.name.slice(0, 32))
     }).catch(() => setAuth({ providers: [], user: null }))
@@ -115,7 +115,6 @@ export default function Signup() {
     setBusy(true); setMsg('')
     try {
       const r = await api('/signup', { method: 'POST', form })
-      localStorage.setItem('zxb-edit', r.edit_token)
       sessionStorage.removeItem(DRAFT)
       setDone(r)
     } catch (err) {
@@ -127,16 +126,13 @@ export default function Signup() {
   }
 
   if (done) {
-    const link = `${location.origin}/status/${done.edit_token}`
     return (
       <main className="wrap narrow">
         <h1 className="display">You're signed up</h1>
         <p>Status: <strong>{done.status === 'waitlisted' ? 'Waitlisted (captain slots full)' : free ? 'In the sub pool' : 'Payment submitted'}</strong>. {free ? 'An organiser will check your rank.' : 'An organiser will verify your payment and rank.'}</p>
         <div className="card">
-          <p><strong>Save your edit link.</strong> It's the only way to check your status or change your sign-up.</p>
-          <p className="mono break">{link}</p>
-          <button className="btn" onClick={() => navigator.clipboard?.writeText(link).then(() => setCopied(true))}>{copied ? 'Copied ✓' : 'Copy link'}</button>{' '}
-          <a className="btn ghost" href={link}>Open status page</a>
+          <p><strong>Your profile has your status.</strong> Sign in any time with this same account to check it or edit your sign-up. We also email you when an organiser decides.</p>
+          <a className="btn" href="/profile">Open my profile</a>
         </div>
       </main>
     )
@@ -156,7 +152,6 @@ export default function Signup() {
         <h1 className="display" tabIndex={-1}>Sign up</h1>
         {auth?.user && <p className="signed-in">Signed in as <strong>{auth.user.name}</strong> with {auth.user.provider === 'google' ? 'Google' : auth.user.provider === 'email' ? 'your email' : 'a dev login'}{auth.user.email && ` (${auth.user.email})`}. Your result is emailed there. <button type="button" className="btn ghost" onClick={signOut}>Sign out</button></p>}
         {errors.auth && <p className="err" role="alert">{errors.auth}</p>}
-        {already && <p className="note">You've already signed up on this device. Check your status instead of paying twice. <a className="btn ghost" href={`/status/${already}`}>Check my status</a></p>}
         <ol className="steps mono" aria-label="Progress">
           {['Profile', 'Path', free ? 'Confirm' : 'Payment'].map((s, i) => <li key={s} aria-current={i === step ? 'step' : undefined} className={i <= step ? 'on' : ''}>{i + 1}. {s}</li>)}
         </ol>
@@ -250,7 +245,7 @@ export default function Signup() {
 const PROVIDER_LABEL = { google: 'Continue with Google', dev: 'Dev login (local only)' }
 
 // Registration needs an account first: one sign-up per account, and an email to send the result to.
-function SignIn({ providers, error, info, path, onDone }) {
+export function SignIn({ providers, error, info, path, onDone, heading = 'Sign in to register', lede }) {
   const what = path === 'leader' ? 'as a captain' : path === 'sub' ? 'for the sub pool' : 'as an auction player'
   const [mode, setMode] = useState('register')
   const [f, setF] = useState({ name: '', email: '', password: '' })
@@ -271,8 +266,8 @@ function SignIn({ providers, error, info, path, onDone }) {
   return (
     <main className="wrap narrow signin">
       <a href="/" className="btn ghost">← {info?.name || 'Home'}</a>
-      <h1 className="display">Sign in to register</h1>
-      <p className="lede">You're signing up {what}. Make an account first so each person registers once. We email your result, like whether you're selected as a captain, to this address.</p>
+      <h1 className="display">{heading}</h1>
+      <p className="lede">{lede || `You're signing up ${what}. Make an account first so each person registers once. We email your result, like whether you're selected as a captain, to this address.`}</p>
       {msg && <p className="err" role="alert">{msg}</p>}
       <div className="signin-options">
         {providers.map(p => <a key={p} className={'btn signin-' + p} href={`/api/v1/auth/${p}/start`}>{PROVIDER_LABEL[p] || p}</a>)}
@@ -294,7 +289,7 @@ function SignIn({ providers, error, info, path, onDone }) {
 }
 
 // Email accounts must click the link we send before they can register.
-function CheckEmail({ user, info, onSignOut, onCheck }) {
+export function CheckEmail({ user, info, onSignOut, onCheck }) {
   const [msg, setMsg] = useState(''), [busy, setBusy] = useState(false)
   const resend = async () => {
     setBusy(true); setMsg('')

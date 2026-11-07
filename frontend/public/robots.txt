@@ -4,6 +4,7 @@ Disallow: /status/
 Disallow: /leader/
 Disallow: /projector
 Disallow: /verified
+Disallow: /profile
 Disallow: /api/
 
 Sitemap: https://zxb.shov.in/sitemap.xml

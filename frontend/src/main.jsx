@@ -3,7 +3,7 @@ import './styles.css'
 import Home from './Home.jsx'
 import Draft from './Draft.jsx'
 import Signup from './Signup.jsx'
-import Status from './Status.jsx'
+import Status, { Profile } from './Status.jsx'
 import Admin from './Admin.jsx'
 import Projector from './Projector.jsx'
 import Leader from './Leader.jsx'
@@ -14,7 +14,8 @@ import { NotFound, Verified } from './Pages.jsx'
 const path = location.pathname.replace(/\/+$/, '') || '/'
 const page = path === '/draft' || path === '/auction' ? <Draft />
   : path.startsWith('/signup') ? <Signup />
-  : path.startsWith('/status/') ? <Status token={decodeURIComponent(path.slice(8))} />
+  : path.startsWith('/status/') ? <Status src={`/signup/${encodeURIComponent(decodeURIComponent(path.slice(8)))}`} />
+  : path === '/profile' ? <Profile />
   : path.startsWith('/admin') ? <Admin />
   : path === '/projector' ? <Projector />
   : path === '/refund-policy' ? <Policy kind="refund" />

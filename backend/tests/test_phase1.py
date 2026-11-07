@@ -264,6 +264,19 @@ async def test_email_account_register_login_and_result_email(c, monkeypatch):
     assert to == "cap@example.com" and "captain" in subject and f"/leader/{out['leader_code']}" in body
 
 
+async def test_profile_by_account_replaces_edit_link(c):
+    assert (await c.get("/api/v1/me/signup")).status_code == 401
+    assert (await c.get("/api/v1/me/signup", headers=signed_in("nobody"))).status_code == 404
+    await signup(c, "auction", who="prof", riot_id="prof#ZXB")
+    me = (await c.get("/api/v1/me/signup", headers=signed_in("prof"))).json()
+    assert me["riot_id"] == "prof#ZXB" and me["editable"] is True and "edit_token" not in me
+    r = await c.patch("/api/v1/me/signup", json={"playstyle": "Lurker"}, headers=signed_in("prof"))
+    assert r.status_code == 200 and r.json()["playstyle"] == "Lurker"
+    assert (await c.patch("/api/v1/me/signup", json={"riot_id": "bad"}, headers=signed_in("prof"))).status_code == 422
+    # someone else's account can't see it
+    assert (await c.get("/api/v1/me/signup", headers=signed_in("prof", "email"))).status_code == 404
+
+
 async def test_admin_uploads_and_removes_upi_qr(c):
     r = await c.put("/api/v1/admin/settings/upi-qr", files={"qr": ("qr.png", img(), "image/png")})
     assert r.status_code == 401

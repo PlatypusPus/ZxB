@@ -14,7 +14,7 @@ export default function Admin() {
   return (
     <main className="admin">
       <header className="admin-bar">
-        <strong className="mono">ZXB ADMIN</strong>
+        <strong className="admin-brand">ZXB <span>Admin</span></strong>
         <nav role="tablist">{TABS.map(t => <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>{t}</button>)}</nav>
         <button className="btn ghost" onClick={logout}>Log out</button>
       </header>
@@ -107,7 +107,7 @@ function Queue({ call, token }) {
                   <td className="mono">{pay.utr}<br />₹{pay.amount} · {pay.status}</td>
                   <td>{pay.screenshot ? <Shot name={pay.screenshot} token={token} /> : <span className="muted">Free sub</span>}</td>
                   <td>{r.status}{r.reject_reason && <><br /><span className="muted small">{r.reject_reason}</span></>}</td>
-                  <td className="acts">
+                  <td><div className="acts">
                     <input placeholder="Reason / note" aria-label={`Reason for ${r.display_name}`} value={note[r.id] || ''} onChange={e => setNote({ ...note, [r.id]: e.target.value })} />
                     {pay.status === 'submitted' && <>
                       <button className="btn" onClick={() => act(`/admin/payments/${pay.id}/verify`, null, r)}>Verify payment</button>
@@ -123,7 +123,7 @@ function Queue({ call, token }) {
                       <button className="btn ghost" onClick={() => act(`/admin/players/${r.id}/withdraw`, null, r)}>Withdraw</button>}
                     {['verified', 'rejected'].includes(pay.status) && ['rejected', 'withdrawn', 'waitlisted'].includes(r.status) &&
                       <button className="btn ghost" onClick={() => act(`/admin/payments/${pay.id}/refund`, { note: reason(r) }, r)}>Mark refunded</button>}
-                  </td>
+                  </div></td>
                 </tr>
               )
             })}
@@ -161,82 +161,138 @@ function Teams({ call }) {
   )
 }
 
-const NUM = ['fee', 'teams', 'credits_per_team', 'min_players', 'max_players', 'bid_increment', 'bid_increment_high',
-  'bid_increment_from', 'bid_timer', 'bid_reset', 'round2_discount', 'flat_base_price']
-const TEXT = ['event_date', 'upi_id', 'upi_name', 'registration_opens_at', 'registration_closes_at']
-const PICK = { base_price_mode: ['band', 'flat'], lot_order: ['rank_band', 'random'] }
-const HELP = {
-  max_players: 'Set after registration closes: at least approved players ÷ teams, rounded up',
-  bid_increment_from: 'Bids at or above this use the high increment (0 = never)',
-  bid_timer: 'Seconds per lot; 0 = auctioneer closes manually',
-  bid_reset: 'Each bid tops the timer back up to this',
-  round2_discount: 'Percent off base price for unsold players in round 2',
-}
+// Settings form, grouped the way an organiser thinks about the event. Keys match the API's settings object.
+const STATUS = { draft: 'Draft (hidden)', registration_open: 'Open for sign-ups', registration_closed: 'Closed' }
+const SECTIONS = [
+  { title: 'Event', note: 'What players see on the site.', fields: [
+    { k: 'event_date', label: 'Event date', kind: 'text', hint: 'Shown on the site, e.g. 11 Nov 2026' },
+    { k: 'registration_opens_at', label: 'Registration opens', kind: 'time', hint: 'Optional, India time' },
+    { k: 'registration_closes_at', label: 'Registration closes', kind: 'time', hint: 'Optional, India time' },
+  ] },
+  { title: 'Payment', note: 'Where players send the entry fee. Paid sign-ups stay blocked until the UPI ID is set.', fields: [
+    { k: 'fee', label: 'Entry fee', kind: 'num', unit: '₹' },
+    { k: 'upi_id', label: 'UPI ID', kind: 'text', hint: 'e.g. zenithxbeans@okaxis' },
+    { k: 'upi_name', label: 'Name on the UPI account', kind: 'text' },
+  ] },
+  { title: 'Teams and budget', fields: [
+    { k: 'teams', label: 'Teams', kind: 'num', hint: 'One captain per team' },
+    { k: 'credits_per_team', label: 'Credits per team', kind: 'num', unit: 'credits' },
+    { k: 'min_players', label: 'Players each team must buy', kind: 'num' },
+    { k: 'max_players', label: 'Most players a team can buy', kind: 'num', optional: true,
+      hint: 'Set after registration closes: approved players ÷ teams, rounded up' },
+  ] },
+  { title: 'Bidding', note: 'Bids are called out in the room and recorded in the Live tab.', fields: [
+    { k: 'bid_increment', label: 'Bid step', kind: 'num', unit: 'credits' },
+    { k: 'bid_increment_high', label: 'Bigger bid step', kind: 'num', unit: 'credits' },
+    { k: 'bid_increment_from', label: 'Use the bigger step from', kind: 'num', unit: 'credits', hint: '0 = never' },
+    { k: 'bid_timer', label: 'Time per player', kind: 'num', unit: 'sec', hint: '0 = the auctioneer closes each player' },
+    { k: 'bid_reset', label: 'Each bid tops the timer up to', kind: 'num', unit: 'sec' },
+  ] },
+  { title: 'Starting prices', fields: [
+    { k: 'base_price_mode', label: 'Starting price', kind: 'pick', opts: { band: 'By rank group', flat: 'Same for everyone' } },
+    { k: 'flat_base_price', label: 'Starting price for everyone', kind: 'num', unit: 'credits', when: c => c.base_price_mode === 'flat' },
+    { k: 'band_base_price', kind: 'bands', when: c => c.base_price_mode !== 'flat' },
+    { k: 'round2_discount', label: 'Round 2 discount for unsold players', kind: 'num', unit: '%' },
+    { k: 'lot_order', label: 'Order players come up', kind: 'pick', opts: { rank_band: 'Highest rank first', random: 'Random' } },
+  ] },
+  { title: 'Role limits', fields: [{ k: 'role_caps', label: 'Role limits', kind: 'caps' }] },
+]
+const ALL = SECTIONS.flatMap(x => x.fields)
+const LABEL = Object.fromEntries(ALL.map(f => [f.k, f.label || f.k]))
 const capsText = o => Object.entries(o || {}).map(([k, v]) => `${k}:${v}`).join(', ')
 const parseCaps = s => Object.fromEntries(s.split(',').map(x => x.split(':').map(y => y.trim()))
-  .filter(([k, v]) => k && v).map(([k, v]) => [k, +v]))
+  .filter(([k, v]) => k && v && !isNaN(+v)).map(([k, v]) => [k, +v]))
+// datetime-local has no timezone; the event runs on India time.
+const toLocal = iso => (iso || '').slice(0, 16)
+const toIso = local => local ? `${local}:00+05:30` : null
 
 function Settings({ call }) {
   const [s, setS] = useState(null)
   const [caps, setCaps] = useState('')
   const [msg, setMsg] = useState('')
+  const [errors, setErrors] = useState({})
+  const [busy, setBusy] = useState(false)
   useEffect(() => { call('/admin/settings').then(r => { setS(r); setCaps(capsText(r.settings.role_caps)) }) }, [])
   if (!s) return <p className="muted">Loading…</p>
+  const cfg = s.settings
+  const touch = k => { setErrors(e => ({ ...e, [k]: undefined })); setMsg('') }
+  const setK = (k, v) => { setS({ ...s, settings: { ...cfg, [k]: v } }); touch(k) }
+
   const save = async e => {
     e.preventDefault()
-    const num = NUM.map(k => [k, s.settings[k] === '' || s.settings[k] == null ? null : +s.settings[k]])
-      .filter(([k, v]) => v !== null || k === 'max_players')
-    const settings = Object.fromEntries([
-      ...num, ...TEXT.map(k => [k, s.settings[k] || null]), ...Object.keys(PICK).map(k => [k, s.settings[k]]),
-      ['role_caps', parseCaps(caps)], ['band_base_price', s.settings.band_base_price],
-    ])
+    const out = {}
+    for (const f of ALL) {
+      const v = cfg[f.k]
+      if (f.kind === 'num') { if (v === '' || v == null) { if (f.optional) out[f.k] = null } else out[f.k] = +v }
+      else if (f.kind === 'caps') out[f.k] = parseCaps(caps)
+      else if (f.kind === 'text' || f.kind === 'time') out[f.k] = v || null
+      else out[f.k] = v
+    }
+    setBusy(true)
     try {
-      setS({ ...s, ...(await call('/admin/settings', { method: 'PUT', body: { name: s.name, status: s.status, settings } })) })
-      setMsg('Saved.')
-    } catch (err) { setMsg(Object.entries(err.errors).map(([k, v]) => `${k}: ${v}`).join(' · ') || err.message) }
+      setS({ ...s, ...(await call('/admin/settings', { method: 'PUT', body: { name: s.name, status: s.status, settings: out } })) })
+      setErrors({}); setMsg('Saved')
+    } catch (err) {
+      setErrors(err.errors || {})
+      setMsg(err.errors && Object.keys(err.errors).length ? `Check ${Object.keys(err.errors).map(k => LABEL[k] || k).join(', ')}` : err.message)
+    } finally { setBusy(false) }
   }
-  const setK = (k, v) => setS({ ...s, settings: { ...s.settings, [k]: v } })
-  const label = k => k.replaceAll('_', ' ')
-  const bands = s.settings.band_base_price
-  const statuses = ['draft', 'registration_open', 'registration_closed']
+
+  const field = f => {
+    if (f.when && !f.when(cfg)) return null
+    const id = 's-' + f.k, err = errors[f.k]
+    const errP = err && <p className="err">{err}</p>
+    if (f.kind === 'bands') return (
+      <div className="field wide" key={f.k}><span className="label">Starting price per rank group</span>
+        {cfg.band_base_price
+          ? <div className="bands">{Object.entries(cfg.band_base_price).sort((x, y) => y[1] - x[1]).map(([b, v]) => (
+              <label key={b}><span>{b}</span>
+                <input type="number" min="0" inputMode="numeric" value={v}
+                  onChange={e => setK('band_base_price', { ...cfg.band_base_price, [b]: +e.target.value })} /></label>))}</div>
+          : <button type="button" className="btn ghost" onClick={async () => setK('band_base_price', (await api('/public')).band_base_price)}>Edit rank group prices</button>}
+        {errP}</div>)
+    if (f.kind === 'caps') return (
+      <div className="field wide" key={f.k}><label htmlFor={id}>Most players per role on a team</label>
+        <input id={id} value={caps} placeholder="Duelist:2, Sentinel:2" onChange={e => { setCaps(e.target.value); touch(f.k) }} />
+        <p className="hint">Captain included. Leave empty for no limits.</p>{errP}</div>)
+    const input = f.kind === 'pick'
+      ? <select id={id} value={cfg[f.k]} onChange={e => setK(f.k, e.target.value)}>
+          {Object.entries(f.opts).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+      : f.kind === 'time'
+        ? <input id={id} type="datetime-local" value={toLocal(cfg[f.k])} aria-invalid={!!err} onChange={e => setK(f.k, toIso(e.target.value))} />
+        : <input id={id} type={f.kind === 'num' ? 'number' : 'text'} min={f.kind === 'num' ? 0 : undefined}
+            inputMode={f.kind === 'num' ? 'numeric' : undefined} value={cfg[f.k] ?? ''} aria-invalid={!!err}
+            onChange={e => setK(f.k, e.target.value)} />
+    return (
+      <div className="field" key={f.k}><label htmlFor={id}>{f.label}</label>
+        {f.unit ? <div className={'unit' + (f.unit === '₹' ? ' pre' : '')}>{input}<span aria-hidden="true">{f.unit}</span></div> : input}
+        {f.hint && <p className="hint">{f.hint}</p>}{errP}</div>)
+  }
+
   return (
     <form className="settings" onSubmit={save}>
-      {s.locked && <p className="err">Locked: the auction has started. Changing budgets mid-auction would lose the room's trust.</p>}
-      <fieldset disabled={s.locked}>
-        <legend className="mono amber">EVENT</legend>
-        <div className="field"><label htmlFor="s-name">Tournament name</label>
-          <input id="s-name" value={s.name} onChange={e => setS({ ...s, name: e.target.value })} /></div>
-        <div className="field"><label htmlFor="s-status">Status</label>
-          <select id="s-status" value={s.status} onChange={e => setS({ ...s, status: e.target.value })}>
-            {statuses.map(x => <option key={x}>{x}</option>)}
-            {!statuses.includes(s.status) && <option>{s.status}</option>}
-          </select></div>
-        {TEXT.map(k => <div className="field" key={k}><label htmlFor={'s-' + k}>{label(k)}</label>
-          <input id={'s-' + k} value={s.settings[k] || ''} placeholder={k.endsWith('_at') ? '2026-11-20T18:00+05:30' : ''}
-            onChange={e => setK(k, e.target.value)} /></div>)}
-      </fieldset>
-      <fieldset disabled={s.locked}>
-        <legend className="mono amber">AUCTION</legend>
-        {NUM.map(k => <div className="field" key={k}><label htmlFor={'s-' + k}>{label(k)}</label>
-          <input id={'s-' + k} type="number" min="0" value={s.settings[k] ?? ''} onChange={e => setK(k, e.target.value)} />
-          {HELP[k] && <p className="hint">{HELP[k]}</p>}</div>)}
-        {Object.entries(PICK).map(([k, opts]) => <div className="field" key={k}><label htmlFor={'s-' + k}>{label(k)}</label>
-          <select id={'s-' + k} value={s.settings[k]} onChange={e => setK(k, e.target.value)}>
-            {opts.map(o => <option key={o}>{o}</option>)}</select></div>)}
-        <div className="field"><label htmlFor="s-caps">Role caps per team</label>
-          <input id="s-caps" value={caps} placeholder="Duelist:2, Sentinel:2" onChange={e => setCaps(e.target.value)} />
-          <p className="hint">Captain included. Leave empty for no caps.</p></div>
-        <div className="field"><span className="label">Base price per rank band</span>
-          {bands
-            ? <div className="bands">{Object.entries(bands).map(([b, v]) => <label key={b}>{b}
-                <input type="number" min="0" value={v} onChange={e => setK('band_base_price', { ...bands, [b]: +e.target.value })} /></label>)}</div>
-            : <button type="button" className="btn ghost"
-                onClick={async () => setK('band_base_price', (await api('/public')).band_base_price)}>Customise band prices</button>}
-        </div>
-      </fieldset>
-      <p className="hint">The UPI QR image is served from frontend/public/upi-qr.png.</p>
-      {msg && <p role="status">{msg}</p>}
-      <button className="btn" disabled={s.locked}>Save settings</button>
+      {s.locked && <p className="err settings-lock">Locked: the auction has started, so budgets and prices can’t change.</p>}
+      {SECTIONS.map((sec, i) => (
+        <fieldset className="set-card" disabled={s.locked} key={sec.title}>
+          <legend>{sec.title}</legend>{sec.note && <p className="hint">{sec.note}</p>}
+          <div className="set-grid">
+            {i === 0 && <>
+              <div className="field wide"><label htmlFor="s-name">Tournament name</label>
+                <input id="s-name" value={s.name} onChange={e => { setS({ ...s, name: e.target.value }); setMsg('') }} /></div>
+              <div className="field"><label htmlFor="s-status">Sign-ups</label>
+                <select id="s-status" value={s.status} onChange={e => { setS({ ...s, status: e.target.value }); setMsg('') }}>
+                  {Object.entries(STATUS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  {!STATUS[s.status] && <option value={s.status}>{s.status.replaceAll('_', ' ')}</option>}
+                </select></div>
+            </>}
+            {sec.fields.map(field)}
+          </div>
+        </fieldset>
+      ))}
+      <div className="settings-save">
+        <p className={msg === 'Saved' ? 'ok' : msg ? 'err' : 'hint'} role="status">{msg || 'Changes apply as soon as you save.'}</p>
+        <button className="btn" disabled={s.locked || busy}>{busy ? 'Saving…' : 'Save settings'}</button>
+      </div>
     </form>
   )
 }
@@ -322,6 +378,7 @@ function Live({ call, token }) {
             </tr>
           ))}</tbody>
         </table>
+        {!snap.teams.length && <p className="muted empty-row">No teams yet. Approve captains in the Queue tab and their teams show up here.</p>}
       </div>
       {snap.recent.length > 0 && <p className="muted small">Last sales: {snap.recent.map(r => `${r.player} → ${r.team} ${r.price}`).join(' · ')}</p>}
     </section>
@@ -337,13 +394,22 @@ function Payments({ token }) {
   return <section className="narrow"><p>Every payment with its UTR and status, plus totals for verified and refunded money.</p><button className="btn" onClick={download}>Download payments.csv</button></section>
 }
 
+// Nested payloads (settings changes) flatten to "changes.fee: 300" so they read as a list, not a JSON blob.
+const flat = (o, pre = '') => Object.entries(o || {}).reduce((acc, [k, v]) =>
+  v && typeof v === 'object' && !Array.isArray(v) ? { ...acc, ...flat(v, `${pre}${k}.`) }
+    : { ...acc, [pre + k]: v == null ? '—' : String(v) }, {})
+
 function Audit({ call }) {
   const [rows, setRows] = useState([])
   useEffect(() => { call('/admin/audit').then(setRows) }, [])
   return (
     <div className="table-wrap"><table>
       <thead><tr><th>When</th><th>Who</th><th>Action</th><th>Details</th></tr></thead>
-      <tbody>{rows.map(a => <tr key={a.id}><td className="mono small">{new Date(a.at).toLocaleString()}</td><td>{a.actor}</td><td>{a.action}</td><td className="mono small">{JSON.stringify(a.payload)}</td></tr>)}</tbody>
+      <tbody>{rows.map(a => <tr key={a.id}>
+        <td className="audit-when">{new Date(a.at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
+        <td>{a.actor}</td><td><code className="audit-act">{a.action}</code></td>
+        <td><dl className="audit-data">{Object.entries(flat(a.payload)).map(([k, v]) => <div key={k}><dt>{k.replaceAll('_', ' ')}</dt><dd>{v}</dd></div>)}</dl></td>
+      </tr>)}</tbody>
     </table></div>
   )
 }

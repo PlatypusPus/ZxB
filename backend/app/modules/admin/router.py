@@ -239,12 +239,17 @@ async def put_settings(body: dict, db: AsyncSession = Depends(get_db), admin: st
         v = changes.get(k)
         if v is not None and not (isinstance(v, dict) and all(isinstance(x, int) and x >= 0 for x in v.values())):
             raise HTTPException(422, {"errors": {k: "A map of name to whole number"}})
+    before, was = settings(t), {"status": t.status, "name": t.name}
     t.settings = {**t.settings, **changes}
     if body.get("status") in ("draft", "registration_open", "registration_closed") and not t.locked_at:
         t.status = body["status"]
     if body.get("name"):
         t.name = str(body["name"])[:80]
-    audit(db, admin, "settings.changed", changes=changes, status=t.status, name=t.name)
+    # Log only what actually changed, so the audit trail stays readable.
+    diff = {k: v for k, v in changes.items() if before.get(k) != v}
+    diff |= {k: v for k, v in {"status": t.status, "name": t.name}.items() if was[k] != v}
+    if diff:
+        audit(db, admin, "settings.changed", **diff)
     await db.commit()
     return {"name": t.name, "status": t.status, "settings": t.settings}
 

@@ -44,11 +44,10 @@ export default function Home() {
       <Nav info={info} />
       <main>
         <section className="hero hero-brand wrap">
-          <img className="lockup" src="/zxb-logo.webp" width="1600" height="396" alt="Zen × Beans" fetchpriority="high" />
-          <h1 className="wordmark display" aria-label="ZenithXBeans">
-            {[...'ZENITHXBEANS'].map((c, i) => (
-              <span key={i} className={'ch' + (i === 6 ? ' x' : i > 6 ? ' beans' : '')} aria-hidden="true" style={{ '--i': i }}><span>{c}</span></span>
-            ))}
+          <h1 className="hero-logo">
+            <img className="zen" src="/zen.webp" width="1200" height="405" alt="Zenith" fetchpriority="high" />
+            <span className="x" aria-label="x">×</span>
+            <img className="beans" src="/beans.webp" width="982" height="558" alt="Beans" fetchpriority="high" />
           </h1>
         </section>
 

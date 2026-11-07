@@ -4,7 +4,7 @@
   --base: #0b0b0d; --tile: #141418; --ink: #f4f1ea; --muted: #8a8a8f;
   /* Zenith = the dark base + amber (numbers, the X); Beans = pink (actions, tags, the BEANS half). Text on pink is dark. */
   --pink: #ff3d8b; --pink-hi: #ff6aa6; --danger: #ff7a66; --amber: #ffb547; --card: #17171c; --line: #2a2a31;
-  /* Type roles: display = Anton (headlines, wordmark); body = Archivo (reading, labels, buttons);
+  /* Type roles: display = Anton (headlines); body = Archivo (reading, labels, buttons);
      mono = Silkscreen, the LED/pixel voice, only for numerals, the ticker and timers. */
   --display: 'Anton', 'Arial Narrow', sans-serif; --body: 'Archivo', system-ui, sans-serif; --mono: 'Silkscreen', ui-monospace, monospace;
 }
@@ -84,10 +84,7 @@ h2.display { font-size: clamp(32px, 5vw, 64px); }
 .nav.scrolled { background: rgb(11 11 13 / .86); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom-color: var(--line); }
 .nav-inner { height: 100%; padding: 0; display: flex; align-items: center; gap: calc(var(--t) * 1.5); }
 .brand { display: inline-flex; align-items: center; gap: 12px; color: var(--ink); text-decoration: none; font-size: 15px; }
-.logo-mark { display: grid; grid-template-columns: repeat(5, 5px); gap: 1px; }
-.logo-mark span { width: 5px; height: 5px; background: var(--tile); }
-.logo-mark .on { background: var(--ink); }
-.logo-mark .top { background: var(--amber); }
+.brand-logo { display: block; height: 40px; width: auto; }
 .nav nav { display: flex; gap: 4px; align-items: center; margin-right: auto; }
 .nav nav a:not(.btn) { position: relative; color: var(--muted); text-decoration: none; padding: 8px 12px; font-weight: 500; }
 .nav nav a:not(.btn):hover, .nav nav a[aria-current=page] { color: var(--ink); }
@@ -348,30 +345,22 @@ th, td { text-align: left; vertical-align: top; padding: 10px; border-bottom: 1p
 .thumb { width: 72px; height: 96px; object-fit: cover; }
 .logo { width: 96px; height: 96px; object-fit: cover; }
 
-/* Home hero: only the wordmark, sized to the column so it always spans it edge to edge. */
+/* Home hero: only the logos, sized to the column. */
 .hero-brand { container-type: inline-size; position: relative; display: flex; flex-direction: column; justify-content: center;
   min-height: calc(100svh - var(--t) * 3); padding: 0 0 calc(var(--t) * 3); }
-h1.wordmark { display: flex; margin: 0; font-size: 19.5cqi; line-height: .8; letter-spacing: -.012em; white-space: nowrap; }
-.wordmark .x { color: var(--amber); }
-.wordmark .beans { color: var(--pink); }
 .hero-brand::after { content: ''; height: 2px; margin-top: calc(var(--t) * 1.5); background: linear-gradient(90deg, var(--amber), var(--pink) 60%, transparent); transform-origin: left; }
 .featured-lede { margin-bottom: calc(var(--t) * 1.5); }
 .featured .meter { margin: var(--t) 0; max-width: 28rem; }
 
-/* Opener: letters rise out of a mask one by one, the X lands last, then the rule wipes and the nav settles in. */
-.wordmark .ch { display: inline-block; line-height: 1; margin: -.1em 0; clip-path: inset(-.3em -.2em 0 -.2em); }
-.wordmark .ch > span { display: inline-block; animation: wm-rise 1.1s cubic-bezier(.16, 1, .3, 1) both; animation-delay: calc(120ms + var(--i) * 55ms); }
-.wordmark .ch.x { clip-path: none; }
-.wordmark .ch.x > span { animation: wm-x .9s cubic-bezier(.16, 1, .3, 1) 820ms both; }
+/* Opener: the logos rise, the X lands, then the rule wipes and the nav settles in. */
 .hero-brand::after { animation: wm-wipe 1.2s cubic-bezier(.65, 0, .35, 1) 1s both; }
 body:has(.hero-brand) .nav { animation: wm-nav .9s cubic-bezier(.16, 1, .3, 1) 1.2s both; }
-@keyframes wm-rise { from { transform: translateY(110%); filter: blur(6px); } }
 @keyframes wm-x { from { transform: scale(2.2) rotate(-12deg); opacity: 0; filter: blur(12px); } 60% { opacity: 1; } }
 @keyframes wm-wipe { from { transform: scaleX(0); } }
 @keyframes wm-fade { from { opacity: 0; } }
 @keyframes wm-nav { from { opacity: 0; transform: translateY(-100%); } }
 @media (prefers-reduced-motion: reduce) {
-  .wordmark .ch > span, .hero-brand::after, body:has(.hero-brand) .nav { animation: none !important; }
+  .hero-brand::after, body:has(.hero-brand) .nav { animation: none !important; }
 }
 @media (max-width: 900px) { .hero-brand { min-height: 0; padding: 14vh 0 10vh; } }
 [id] { scroll-margin-top: calc(var(--t) * 4); }
@@ -495,7 +484,11 @@ a.event:hover .event-go { transform: translateX(6px); }
 .split.three { grid-template-columns: repeat(3, 1fr); }
 @media (max-width: 900px) { .split.three { grid-template-columns: 1fr; } }
 
-/* Home hero: the Zen x Beans lockup sits above the wordmark and rises in first. */
-.lockup { display: block; width: min(100%, 760px); height: auto; margin-bottom: calc(var(--t) * 1.5); animation: wm-rise-img 1s cubic-bezier(.16, 1, .3, 1) both; }
-@keyframes wm-rise-img { from { opacity: 0; transform: translateY(24px); filter: blur(6px); } }
-@media (prefers-reduced-motion: reduce) { .lockup { animation: none; } }
+/* Home hero: the Zen x Beans logos in place of a typed wordmark. Zen rises, the x lands, Beans rises. */
+h1.hero-logo { display: flex; align-items: center; gap: 3cqi; margin: 0; }
+.hero-logo img { display: block; height: auto; min-width: 0; animation: wm-rise-img 1.1s cubic-bezier(.16, 1, .3, 1) both; }
+.hero-logo .zen { width: 47%; animation-delay: 120ms; }
+.hero-logo .beans { width: 41%; animation-delay: 420ms; }
+.hero-logo .x { flex: none; font: 400 9cqi/1 var(--display); color: var(--amber); animation: wm-x .9s cubic-bezier(.16, 1, .3, 1) 820ms both; }
+@keyframes wm-rise-img { from { opacity: 0; transform: translateY(40px); filter: blur(8px); } }
+@media (prefers-reduced-motion: reduce) { .hero-logo img, .hero-logo .x { animation: none; } }

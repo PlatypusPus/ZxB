@@ -2,14 +2,9 @@ import { useEffect, useState } from 'react'
 
 const RIOT_NOTICE = "ZenithXBeans' tournaments aren't endorsed by Riot Games and don't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc."
 
-// The mark: a Z drawn on a 5x5 tile grid, with one amber tile at the zenith.
-const Z = ['11112', '00010', '00100', '01000', '11111']
+// The Zen x Beans lockup, used as the home link.
 export function Logo() {
-  return (
-    <span className="logo-mark" aria-hidden="true">
-      {Z.join('').split('').map((v, i) => <span key={i} className={v === '1' ? 'on' : v === '2' ? 'top' : ''} />)}
-    </span>
-  )
+  return <img className="brand-logo" src="/zxb-logo-nav.webp" width="388" height="96" alt="" />
 }
 
 const LINKS = [['/', 'Home'], ['/#tournaments', 'Tournaments'], ['/draft', 'Valorant Auction']]
@@ -28,7 +23,7 @@ export function Nav({ info }) {
   return (
     <header className={'nav' + (scrolled ? ' scrolled' : '') + (open ? ' open' : '')}>
       <div className="nav-inner wrap">
-        <a href="/" className="brand" aria-label="ZenithXBeans home"><Logo /><span className="mono">ZENITHXBEANS</span></a>
+        <a href="/" className="brand" aria-label="ZenithXBeans home"><Logo /></a>
         <nav id="nav-links" aria-label="Main">
           {LINKS.map(([href, label]) => (
             <a key={href} href={href} aria-current={href === here ? 'page' : undefined} onClick={() => setOpen(false)}>{label}</a>
@@ -110,7 +105,7 @@ export function Footer() {
   return (
     <footer className="wrap footer" data-section>
       <div className="grid3">
-        <div><a href="/" className="brand"><Logo /><span className="mono">ZENITHXBEANS</span></a><p className="muted">Community tournaments, run in the open.</p></div>
+        <div><a href="/" className="brand" aria-label="ZenithXBeans home"><Logo /></a><p className="muted">Community tournaments, run in the open.</p></div>
         <div><p><strong>Refund policy</strong></p><p className="muted">Published before sign-ups open for each tournament.</p></div>
         <div><p><strong>Contact</strong></p><p className="muted">ZenithXBeans on Discord.</p></div>
       </div>

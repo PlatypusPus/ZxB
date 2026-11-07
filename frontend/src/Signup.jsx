@@ -208,7 +208,7 @@ export default function Signup() {
               <li>
                 <strong>Pay exactly ₹{info?.fee ?? 300}</strong> to <strong>{info?.upi_name || 'ZenithXBeans'}</strong>
                 {info?.upi_id ? <> at <code>{info.upi_id}</code></> : <span className="err"> (the UPI ID isn't published yet, so you can't pay today)</span>}
-                {info?.upi_id && <img src="/upi-qr.png" alt={`UPI QR code for ${info.upi_id}`} className="qr" onError={e => (e.currentTarget.hidden = true)} />}
+                {info?.upi_id && info.upi_qr_url && <img src={info.upi_qr_url} alt={`UPI QR code for ${info.upi_id}`} className="qr" />}
                 {info?.upi_id && <a className="btn ghost mobile-only" href={upi}>Open my UPI app</a>}
               </li>
               <li><strong>Copy the 12-digit UTR</strong> from the payment details. Apps also call it UPI reference or transaction ID.</li>

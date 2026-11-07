@@ -226,3 +226,17 @@ async def test_signup_needs_login_and_one_per_account(c):
     assert again.status_code == 409 and "already signed up" in again.json()["detail"]["errors"]["auth"]
     me = (await c.get("/api/v1/auth/me", headers=signed_in("acct1", "discord"))).json()
     assert me["user"]["provider"] == "discord"
+
+
+async def test_admin_uploads_and_removes_upi_qr(c):
+    r = await c.put("/api/v1/admin/settings/upi-qr", files={"qr": ("qr.png", img(), "image/png")})
+    assert r.status_code == 401
+    r = await c.put("/api/v1/admin/settings/upi-qr", files={"qr": ("qr.txt", b"nope", "text/plain")}, headers=c.admin)
+    assert r.status_code == 422
+    r = await c.put("/api/v1/admin/settings/upi-qr", files={"qr": ("qr.png", img(), "image/png")}, headers=c.admin)
+    url = r.json()["upi_qr_url"]
+    assert (await c.get("/api/v1/public")).json()["upi_qr_url"] == url
+    assert (await c.get(url)).status_code == 200
+    assert (await c.delete("/api/v1/admin/settings/upi-qr", headers=c.admin)).json()["upi_qr_url"] is None
+    assert (await c.get("/api/v1/public")).json()["upi_qr_url"] is None
+    assert (await c.get(url)).status_code == 404

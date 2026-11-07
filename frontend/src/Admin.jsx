@@ -173,6 +173,7 @@ const SECTIONS = [
     { k: 'fee', label: 'Entry fee', kind: 'num', unit: '₹' },
     { k: 'upi_id', label: 'UPI ID', kind: 'text', hint: 'e.g. zenithxbeans@okaxis' },
     { k: 'upi_name', label: 'Name on the UPI account', kind: 'text' },
+    { k: 'upi_qr', kind: 'qr' },
   ] },
   { title: 'Teams and budget', fields: [
     { k: 'teams', label: 'Teams', kind: 'num', hint: 'One captain per team' },
@@ -224,6 +225,7 @@ function Settings({ call }) {
     for (const f of ALL) {
       const v = cfg[f.k]
       if (f.kind === 'num') { if (v === '' || v == null) { if (f.optional) out[f.k] = null } else out[f.k] = +v }
+      else if (f.kind === 'qr') continue   // saved by its own upload button
       else if (f.kind === 'caps') out[f.k] = parseCaps(caps)
       else if (f.kind === 'text' || f.kind === 'time') out[f.k] = v || null
       else out[f.k] = v
@@ -251,6 +253,8 @@ function Settings({ call }) {
                   onChange={e => setK('band_base_price', { ...cfg.band_base_price, [b]: +e.target.value })} /></label>))}</div>
           : <button type="button" className="btn ghost" onClick={async () => setK('band_base_price', (await api('/public')).band_base_price)}>Edit rank group prices</button>}
         {errP}</div>)
+    if (f.kind === 'qr') return <QrField key={f.k} call={call} name={cfg.upi_qr}
+      onChange={n => setS(p => ({ ...p, settings: { ...p.settings, upi_qr: n } }))} />
     if (f.kind === 'caps') return (
       <div className="field wide" key={f.k}><label htmlFor={id}>Most players per role on a team</label>
         <input id={id} value={caps} placeholder="Duelist:2, Sentinel:2" onChange={e => { setCaps(e.target.value); touch(f.k) }} />
@@ -294,6 +298,39 @@ function Settings({ call }) {
         <button className="btn" disabled={s.locked || busy}>{busy ? 'Saving…' : 'Save settings'}</button>
       </div>
     </form>
+  )
+}
+
+// Upload saves straight away (separate from the Save button) so the image never sits half-saved.
+function QrField({ call, name, onChange }) {
+  const [msg, setMsg] = useState(''), [busy, setBusy] = useState(false)
+  const run = async (opts, done) => {
+    setBusy(true); setMsg('')
+    try { onChange((await call('/admin/settings/upi-qr', opts)).upi_qr); setMsg(done) }
+    catch (err) { setMsg(err.errors?.upi_qr || err.message) }
+    finally { setBusy(false) }
+  }
+  const upload = e => {
+    const file = e.target.files[0]; e.target.value = ''
+    if (!file) return
+    const form = new FormData(); form.append('qr', file)
+    run({ method: 'PUT', form }, 'QR code updated')
+  }
+  return (
+    <div className="field wide qr-field">
+      <span className="label">UPI QR code</span>
+      <div className="qr-row">
+        {name ? <img src={`/media/${name}`} alt="Current UPI QR code" className="qr-preview" />
+          : <div className="qr-preview qr-empty">No QR yet</div>}
+        <div className="qr-actions">
+          <label className="btn ghost">{name ? 'Replace QR image' : 'Upload QR image'}
+            <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={busy} onChange={upload} /></label>
+          {name && <button type="button" className="btn ghost" disabled={busy} onClick={() => run({ method: 'DELETE' }, 'QR code removed')}>Remove</button>}
+          <p className={msg && !msg.startsWith('QR') ? 'err' : 'hint'} role="status">
+            {busy ? 'Uploading…' : msg || 'PNG, JPG or WebP, up to 2 MB. Shown on the payment step and saved straight away.'}</p>
+        </div>
+      </div>
+    </div>
   )
 }
 

@@ -21,7 +21,7 @@ First run creates `.env` with a dev admin login: `admin@zenithxbeans.local` / `d
 For a real password: `cd backend && uv run --python 3.12 python -m app.main hash 'your-password'` and put it in `.env`.
 
 `.env` (never commit): `SECRET_KEY`, `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH`.
-Put the organiser's UPI QR at `frontend/public/upi-qr.png`; set the UPI ID, dates and status in Admin → Settings.
+Set the UPI ID, upload the UPI QR image, and set dates and status in Admin → Settings.
 
 ## Dress rehearsal with dummy data
 

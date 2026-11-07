@@ -537,3 +537,10 @@ input[type=datetime-local] { color-scheme: dark; }
 .audit-data dt { color: var(--muted); }
 .audit-data dd { margin: 0; overflow-wrap: anywhere; }
 @media (max-width: 700px) { .admin-bar { gap: 12px; } .admin-bar nav { order: 3; flex-basis: 100%; } .admin-bar > .btn { margin-left: auto; } }
+
+/* Admin: UPI QR control */
+.qr-row { display: flex; gap: var(--t); align-items: flex-start; flex-wrap: wrap; }
+.qr-preview { width: 140px; height: 140px; object-fit: contain; background: #fff; border: 1px solid var(--line); }
+.qr-empty { display: grid; place-items: center; background: var(--base); color: var(--muted); font-size: 14px; }
+.qr-actions { display: grid; gap: 8px; justify-items: start; flex: 1; min-width: 180px; }
+.qr-actions label.btn { cursor: pointer; }

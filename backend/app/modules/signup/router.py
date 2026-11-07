@@ -38,6 +38,7 @@ async def public_info(db: AsyncSession = Depends(get_db)):
     signups = await db.scalar(select(func.count()).where(Player.status.not_in(["rejected", "withdrawn"])))
     return {"name": t.name, "host": t.host, "status": t.status, "registration_open": registration_open(t),
             "event_date": s["event_date"], "fee": s["fee"], "upi_id": s["upi_id"], "upi_name": s["upi_name"],
+            "upi_qr_url": s.get("upi_qr") and f"/media/{s['upi_qr']}",
             "signups": signups, "leader_slots_left": max(0, s["teams"] - await approved_leaders(db)),
             "teams": s["teams"], "credits_per_team": s["credits_per_team"], "min_players": s["min_players"],
             "ranks": cfg["ranks"], "roles": cfg["roles"], "band_base_price": cfg["band_base_price"],

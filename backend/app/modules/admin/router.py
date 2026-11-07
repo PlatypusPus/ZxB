@@ -5,11 +5,11 @@ import re
 from datetime import datetime
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...core import (ADMIN_EMAIL, ADMIN_PASSWORD_HASH, PRIVATE_DIR, audit, check_password, get_db, new_token,
+from ...core import (ADMIN_EMAIL, ADMIN_PASSWORD_HASH, PRIVATE_DIR, PUBLIC_DIR, audit, image_name, process_image, check_password, get_db, new_token,
                      publish, rate_limit, require_admin, sign_admin_token, utcnow)
 from ...models import AuditLog, Payment, Player, Team
 from ...tournament import approved_leaders, load, settings
@@ -252,6 +252,34 @@ async def put_settings(body: dict, db: AsyncSession = Depends(get_db), admin: st
         audit(db, admin, "settings.changed", **diff)
     await db.commit()
     return {"name": t.name, "status": t.status, "settings": t.settings}
+
+
+@router.put("/settings/upi-qr")
+async def put_upi_qr(qr: UploadFile = File(...), db: AsyncSession = Depends(get_db), admin: str = Depends(require_admin)):
+    """The QR players scan to pay. Stored as public media; the old image is deleted."""
+    data = process_image(await qr.read(2**21 + 1), "upi_qr", False)
+    t, _ = await load(db, lock=True)
+    old, name = t.settings.get("upi_qr"), image_name()
+    PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
+    (PUBLIC_DIR / name).write_bytes(data)
+    t.settings = {**t.settings, "upi_qr": name}
+    audit(db, admin, "settings.changed", upi_qr="uploaded")
+    await db.commit()
+    if old:
+        (PUBLIC_DIR / old).unlink(missing_ok=True)
+    return {"upi_qr": name, "upi_qr_url": f"/media/{name}"}
+
+
+@router.delete("/settings/upi-qr")
+async def delete_upi_qr(db: AsyncSession = Depends(get_db), admin: str = Depends(require_admin)):
+    t, _ = await load(db, lock=True)
+    old = t.settings.get("upi_qr")
+    t.settings = {**t.settings, "upi_qr": None}
+    audit(db, admin, "settings.changed", upi_qr="removed")
+    await db.commit()
+    if old:
+        (PUBLIC_DIR / old).unlink(missing_ok=True)
+    return {"upi_qr": None, "upi_qr_url": None}
 
 
 @router.get("/settings")

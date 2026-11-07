@@ -287,7 +287,7 @@ input[aria-invalid=true], select[aria-invalid=true] { border-color: var(--danger
 .admin-bar nav button.on { background: var(--pink); border-color: var(--pink); color: var(--base); }
 .toolbar { display: flex; gap: var(--t); align-items: center; margin-bottom: 12px; }
 .toolbar select { width: auto; }
-.flash { background: var(--card); border-left: 4px solid var(--amber); padding: 12px; word-break: break-all; }
+.flash { background: var(--card); border: 1px solid var(--amber); padding: 12px; word-break: break-all; }
 .table-wrap { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; background: var(--card); }
 th, td { text-align: left; vertical-align: top; padding: 10px; border-bottom: 1px solid var(--line); font-size: 14px; }

@@ -17,7 +17,7 @@ export function Field({ label, name, err, hint, children, ...input }) {
   )
 }
 
-export function ProfileFields({ v, set, errors, info, discordLocked }) {
+export function ProfileFields({ v, set, errors, info }) {
   const ranks = info?.ranks || []
   const pick = (name, label, opts) => (
     <Field label={label} name={name} err={errors[name]} required>
@@ -40,7 +40,7 @@ export function ProfileFields({ v, set, errors, info, discordLocked }) {
       {pick('role', 'Primary role', info?.roles || [])}
       {text('playstyle', 'Playstyle one-liner', { required: true, maxLength: 80, placeholder: 'Aggressive entry, loves Jett' })}
       {text('quote', 'Quote (optional)', { maxLength: 80, hint: 'Shown in italics on your auction card' })}
-      {text('discord', 'Discord username', discordLocked ? { required: true, readOnly: true, hint: 'From your Discord sign-in' } : { required: true, autoComplete: 'off' })}
+      {text('discord', 'Discord username (optional)', { maxLength: 37, autoComplete: 'off' })}
       {text('phone', 'Phone (WhatsApp)', { required: true, type: 'tel', autoComplete: 'tel-national', inputMode: 'numeric', placeholder: '98765 43210', hint: 'Never shown publicly' })}
     </>
   )
@@ -71,14 +71,12 @@ export default function Signup() {
   const [msg, setMsg] = useState('')
   const [done, setDone] = useState(null)
   useEffect(() => { api('/public').then(setInfo).catch(e => setMsg(e.message)) }, [])
-  const [auth, setAuth] = useState(null)   // { providers, user } from the Discord/Google sign-in
-  useEffect(() => {
-    api('/auth/me').then(a => {
+  const [auth, setAuth] = useState(null)   // { providers, user } from the Google or email sign-in
+  const loadAuth = () => api('/auth/me').then(a => {
       setAuth(a)
-      if (a.user?.provider === 'discord') set('discord', a.user.discord)
       if (a.user && !v.display_name) set('display_name', a.user.name.slice(0, 32))
     }).catch(() => setAuth({ providers: [], user: null }))
-  }, [])
+  useEffect(() => { loadAuth() }, [])
   const loginError = new URLSearchParams(location.search).get('login_error')
   const signOut = async () => { await api('/auth/logout', { method: 'POST' }); setAuth(a => ({ ...a, user: null })) }
 
@@ -91,7 +89,7 @@ export default function Signup() {
   const leaderOpen = (info?.leader_slots_left ?? 0) > 0
   const preview = { ...v, current_rank: ranks[v.current_rank - 1], peak_rank: ranks[v.peak_rank - 1], photo_url: files.photo?.url }
 
-  const required = [['display_name', 'riot_id', 'current_rank', 'peak_rank', 'role', 'playstyle', 'discord', 'phone'],
+  const required = [['display_name', 'riot_id', 'current_rank', 'peak_rank', 'role', 'playstyle', 'phone'],
     v.path === 'leader' ? ['team_name', 'team_tag'] : [], ['utr']]
   const next = () => {
     const e = Object.fromEntries(required[step].filter(k => !String(v[k]).trim()).map(k => [k, 'Required']))
@@ -144,7 +142,8 @@ export default function Signup() {
     )
   }
   if (info && !info.registration_open) return <main className="wrap narrow"><h1 className="display">Registration is closed</h1><a className="btn" href="/">Back to home</a></main>
-  if (auth && !auth.user) return <SignIn providers={auth.providers} error={loginError} info={info} path={v.path} />
+  if (auth?.user && auth.user.verified === false) return <CheckEmail user={auth.user} info={info} onSignOut={signOut} onCheck={loadAuth} />
+  if (auth && !auth.user) return <SignIn providers={auth.providers} error={loginError} info={info} path={v.path} onDone={loadAuth} />
 
   const upi = `upi://pay?pa=${encodeURIComponent(info?.upi_id || '')}&pn=${encodeURIComponent(info?.upi_name || 'ZenithXBeans')}&am=${info?.fee ?? 300}&cu=INR&tn=ZXB%20signup`
   return (
@@ -152,7 +151,7 @@ export default function Signup() {
       <form onSubmit={submit} noValidate className="signup-form">
         <a href="/" className="btn ghost">← {info?.name || 'Home'}</a>
         <h1 className="display" tabIndex={-1}>Sign up</h1>
-        {auth?.user && <p className="signed-in">Signed in as <strong>{auth.user.name}</strong> with {auth.user.provider === 'discord' ? 'Discord' : auth.user.provider === 'google' ? 'Google' : 'a dev login'}{auth.user.email && ` (${auth.user.email})`}. <button type="button" className="btn ghost" onClick={signOut}>Sign out</button></p>}
+        {auth?.user && <p className="signed-in">Signed in as <strong>{auth.user.name}</strong> with {auth.user.provider === 'google' ? 'Google' : auth.user.provider === 'email' ? 'your email' : 'a dev login'}{auth.user.email && ` (${auth.user.email})`}. Your result is emailed there. <button type="button" className="btn ghost" onClick={signOut}>Sign out</button></p>}
         {errors.auth && <p className="err" role="alert">{errors.auth}</p>}
         {already && <p className="note">You've already signed up on this device. Check your status instead of paying twice. <a className="btn ghost" href={`/status/${already}`}>Check my status</a></p>}
         <ol className="steps mono" aria-label="Progress">
@@ -161,7 +160,7 @@ export default function Signup() {
         {msg && <p className="err" role="alert">{msg}</p>}
 
         {step === 0 && <>
-          <ProfileFields v={v} set={set} errors={errors} info={info} discordLocked={auth?.user?.provider === 'discord'} />
+          <ProfileFields v={v} set={set} errors={errors} info={info} />
           <Field label="Profile photo (optional)" name="photo" err={errors.photo} hint="Square crop, max 2 MB">
             {id => <input id={id} type="file" accept="image/png,image/jpeg,image/webp" onChange={e => setFile('photo', e.target.files[0])} />}
           </Field>
@@ -245,23 +244,74 @@ export default function Signup() {
   )
 }
 
-const PROVIDER_LABEL = { discord: 'Continue with Discord', google: 'Continue with Google', dev: 'Dev login (local only)' }
+const PROVIDER_LABEL = { google: 'Continue with Google', dev: 'Dev login (local only)' }
 
-// Registration needs a Discord or Google sign-in first: one sign-up per account, and a real way to reach people.
-function SignIn({ providers, error, info, path }) {
+// Registration needs an account first: one sign-up per account, and an email to send the result to.
+function SignIn({ providers, error, info, path, onDone }) {
   const what = path === 'leader' ? 'as a captain' : path === 'sub' ? 'for the sub pool' : 'as an auction player'
+  const [mode, setMode] = useState('register')
+  const [f, setF] = useState({ name: '', email: '', password: '' })
+  const [errs, setErrs] = useState({}), [msg, setMsg] = useState(error || ''), [busy, setBusy] = useState(false)
+  const put = (k, val) => { setF(o => ({ ...o, [k]: val })); setErrs(e => ({ ...e, [k]: undefined })) }
+  const submit = async e => {
+    e.preventDefault()
+    setBusy(true); setMsg('')
+    try {
+      await api(`/auth/${mode}`, { method: 'POST', body: mode === 'login' ? { email: f.email, password: f.password } : f })
+      await onDone()
+    } catch (err) { setErrs(err.errors || {}); setMsg(Object.keys(err.errors || {}).length ? '' : err.message) }
+    finally { setBusy(false) }
+  }
+  const input = (k, label, props) => (
+    <Field label={label} name={'acct-' + k} err={errs[k]} value={f[k]} onChange={e => put(k, e.target.value)} required {...props} />
+  )
   return (
     <main className="wrap narrow signin">
       <a href="/" className="btn ghost">← {info?.name || 'Home'}</a>
       <h1 className="display">Sign in to register</h1>
-      <p className="lede">You're signing up {what}. Sign in first so each person registers once and the organisers can reach you.</p>
-      {error && <p className="err" role="alert">{error}</p>}
+      <p className="lede">You're signing up {what}. Make an account first so each person registers once. We email your result, like whether you're selected as a captain, to this address.</p>
+      {msg && <p className="err" role="alert">{msg}</p>}
       <div className="signin-options">
-        {providers.length ? providers.map(p => (
-          <a key={p} className={'btn signin-' + p} href={`/api/v1/auth/${p}/start`}>{PROVIDER_LABEL[p]}</a>
-        )) : <p className="err">Sign-in isn't set up yet, so registration can't open. Message the organisers on Discord.</p>}
+        {providers.map(p => <a key={p} className={'btn signin-' + p} href={`/api/v1/auth/${p}/start`}>{PROVIDER_LABEL[p] || p}</a>)}
       </div>
-      <p className="muted small">We only read your name, account ID and, for Google, your email. See the <a href="/privacy">privacy notice</a>.</p>
+      {providers.length > 0 && <p className="signin-or muted">or use your email</p>}
+      <form className="signin-form" onSubmit={submit} noValidate>
+        <div className="signin-tabs" role="tablist">
+          <button type="button" role="tab" aria-selected={mode === 'register'} className={mode === 'register' ? 'on' : ''} onClick={() => { setMode('register'); setErrs({}); setMsg('') }}>Create account</button>
+          <button type="button" role="tab" aria-selected={mode === 'login'} className={mode === 'login' ? 'on' : ''} onClick={() => { setMode('login'); setErrs({}); setMsg('') }}>Log in</button>
+        </div>
+        {mode === 'register' && input('name', 'Your name', { autoComplete: 'name', maxLength: 64 })}
+        {input('email', 'Email', { type: 'email', autoComplete: 'email', maxLength: 254 })}
+        {input('password', 'Password', { type: 'password', autoComplete: mode === 'login' ? 'current-password' : 'new-password', minLength: 8, maxLength: 128, hint: mode === 'register' ? 'At least 8 characters' : undefined })}
+        <button className="btn" disabled={busy}>{busy ? 'One moment…' : mode === 'login' ? 'Log in' : 'Create account'}</button>
+      </form>
+      <p className="muted small">We keep your name and email, and never see your Google password. See the <a href="/privacy">privacy notice</a>.</p>
+    </main>
+  )
+}
+
+// Email accounts must click the link we send before they can register.
+function CheckEmail({ user, info, onSignOut, onCheck }) {
+  const [msg, setMsg] = useState(''), [busy, setBusy] = useState(false)
+  const resend = async () => {
+    setBusy(true); setMsg('')
+    try {
+      const r = await api('/auth/resend', { method: 'POST' })
+      if (r.verified) return onCheck()
+      setMsg(r.emailed ? 'Sent again. Check your inbox and spam folder.' : 'We couldn’t send the email just now. Try again in a few minutes.')
+    } catch (e) { setMsg(e.message) } finally { setBusy(false) }
+  }
+  return (
+    <main className="wrap narrow signin">
+      <a href="/" className="btn ghost">← {info?.name || 'Home'}</a>
+      <h1 className="display">Check your email</h1>
+      <p className="lede">We sent a link to <strong>{user.email}</strong>. Open it to verify your email, then you can finish signing up. Already clicked it?</p>
+      {msg && <p role="status">{msg}</p>}
+      <div className="actions">
+        <button type="button" className="btn" onClick={onCheck}>I’ve verified, continue</button>
+        <button type="button" className="btn ghost" disabled={busy} onClick={resend}>Send the link again</button>
+        <button type="button" className="btn ghost" onClick={onSignOut}>Use a different email</button>
+      </div>
     </main>
   )
 }

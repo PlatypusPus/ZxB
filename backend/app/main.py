@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -61,7 +62,12 @@ if (DIST / "index.html").is_file():
         if path.startswith("api/"):
             return JSONResponse({"detail": "Not found"}, status_code=404)
         f = (DIST / path).resolve()
-        return FileResponse(f if path and f.is_file() and DIST.resolve() in f.parents else DIST / "index.html")
+        if path and f.is_file() and DIST.resolve() in f.parents:
+            return FileResponse(f)
+        # Unknown pages still get the app (it shows the 404 screen), but with a real 404 status for search engines.
+        known = re.fullmatch(r"(draft|auction|signup|admin|projector|refund-policy|privacy|verified|"
+                             r"status/.+|leader/.+)?", path.rstrip("/"))
+        return FileResponse(DIST / "index.html", status_code=200 if known else 404)
 
 if __name__ == "__main__" and sys.argv[1:2] == ["hash"]:
     print(hash_password(sys.argv[2]))  # python -m app.main hash 'password' -> ADMIN_PASSWORD_HASH

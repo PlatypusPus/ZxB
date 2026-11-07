@@ -8,6 +8,7 @@ import Admin from './Admin.jsx'
 import Projector from './Projector.jsx'
 import Leader from './Leader.jsx'
 import Policy from './Policy.jsx'
+import { NotFound, Verified } from './Pages.jsx'
 
 // ponytail: nine routes, so a pathname switch instead of a router library.
 const path = location.pathname.replace(/\/+$/, '') || '/'
@@ -19,7 +20,34 @@ const page = path === '/draft' || path === '/auction' ? <Draft />
   : path === '/refund-policy' ? <Policy kind="refund" />
   : path === '/privacy' ? <Policy kind="privacy" />
   : path.startsWith('/leader/') ? <Leader code={decodeURIComponent(path.slice(8))} />
-  : <Home />
+  : path === '/verified' ? <Verified />
+  : path === '/' ? <Home />
+  : <NotFound />
+
+// Per-page title, description and canonical URL. Private pages (links with secrets, admin) stay out of search.
+const SITE = 'https://zxb.shov.in'
+const META = {
+  '/': ['ZenithXBeans · Community Valorant Tournaments', 'Community Valorant tournaments hosted by ZenithXBeans. The Valorant Auction: captains bid for players live, 10 teams, ₹300 entry.'],
+  '/draft': ['Valorant Auction · ZenithXBeans', 'Sign up as a captain, get auctioned as a player for ₹300, or join the free sub pool. Auction on 11 Nov 2026, playoffs to 22 Nov.'],
+  '/signup': ['Sign up · ZenithXBeans Valorant Auction', 'Register for the ZenithXBeans Valorant Auction as a captain, auction player or sub.'],
+  '/refund-policy': ['Refund policy · ZenithXBeans', 'Entry fees are not refunded, but you can swap your place with another player.'],
+  '/privacy': ['Privacy · ZenithXBeans', 'What ZenithXBeans collects when you register, and who can see it.'],
+  '/verified': ['Email verified · ZenithXBeans', 'Your email is verified.'],
+}
+const canon = path === '/auction' ? '/draft' : path
+const [title, desc] = META[canon] || (page.type === NotFound ? ['Page not found · ZenithXBeans', ''] : [document.title, ''])
+document.title = title
+const meta = (attr, key, content) => {
+  let el = document.head.querySelector(`meta[${attr}="${key}"]`)
+  if (!el) { el = document.createElement('meta'); el.setAttribute(attr, key); document.head.append(el) }
+  el.setAttribute('content', content)
+}
+if (desc) { meta('name', 'description', desc); meta('property', 'og:description', desc) }
+meta('property', 'og:title', title)
+if (META[canon]) {
+  meta('property', 'og:url', SITE + canon)
+  document.head.append(Object.assign(document.createElement('link'), { rel: 'canonical', href: SITE + canon }))
+} else meta('name', 'robots', 'noindex')
 
 createRoot(document.getElementById('root')).render(page)
 

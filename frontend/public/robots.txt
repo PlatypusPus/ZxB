@@ -1,0 +1,9 @@
+User-agent: *
+Disallow: /admin
+Disallow: /status/
+Disallow: /leader/
+Disallow: /projector
+Disallow: /verified
+Disallow: /api/
+
+Sitemap: https://zxb.shov.in/sitemap.xml

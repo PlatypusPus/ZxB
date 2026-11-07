@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...core import (PRIVATE_DIR, PUBLIC_DIR, audit, get_db, image_name, new_token, process_image,
                      publish, rate_limit, sha256, utcnow)
 from ...models import Payment, Player, Sale, Team
-from ..auth import require_identity
+from ..auth import require_identity, is_verified
 from ...tournament import (TERMS_VERSION, approved_leaders, load, public_card, registration_open,
                            validate_profile, validate_team)
 
@@ -82,8 +82,8 @@ async def signup(
 ):
     rate_limit(request, "signup", *SIGNUP_LIMIT)
     who = require_identity(request)
-    if who["provider"] == "discord":
-        discord = who["discord"]   # verified by Discord, so it can't be typed wrong
+    if not await is_verified(db, who):
+        raise HTTPException(403, "Verify your email first. Open the link we emailed you.")
     t, cfg = await load(db)
     if not registration_open(t):
         raise HTTPException(403, "Registration is closed")
@@ -169,7 +169,6 @@ def own_view(p: Player, pay: Payment, team: Team | None, cfg: dict, editable: bo
     return {**public_card(p, cfg), "status": p.status, "reject_reason": p.reject_reason, "path": p.path,
             "discord": p.discord, "phone": p.phone, "payment_status": pay.status,
             "current_rank_tier": p.current_rank_tier, "peak_rank_tier": p.peak_rank_tier, "editable": editable,
-            "discord_verified": p.auth_provider == "discord",
             "team": team and {"name": team.name, "tag": team.tag, "logo_url": f"/media/{team.logo}",
                               "profile_status": team.profile_status}}
 
@@ -198,8 +197,6 @@ async def edit_signup(token: str, body: dict, request: Request, db: AsyncSession
     d = {"display_name": p.display_name, "riot_id": p.riot_id, "playstyle": p.playstyle, "quote": p.quote,
          "discord": p.discord, "phone": p.phone, "role": p.role, "current_rank": p.current_rank_tier,
          "peak_rank": p.peak_rank_tier, "team_name": team.name if team else "", "team_tag": team.tag if team else ""}
-    if p.auth_provider == "discord":
-        body.pop("discord", None)   # verified at sign-in, so it stays as Discord reported it
     d |= {k: body[k] for k in fields + ("team_name", "team_tag") if k in body}
     errors = validate_profile(d, cfg) | (validate_team(d) if team else {})
     if errors:

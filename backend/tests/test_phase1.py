@@ -23,11 +23,11 @@ _n = iter(range(10**6))
 
 
 def signed_in(sub, provider="google"):
-    """Cookie header for someone who signed in with Discord or Google."""
-    return {"cookie": "zxb_id=" + issue_identity(provider, str(sub), f"Person {sub}", discord=f"disc{sub}", email=f"p{sub}@x.in")}
+    """Cookie header for someone who signed in with Google or an email account."""
+    return {"cookie": "zxb_id=" + issue_identity(provider, str(sub), f"Person {sub}", email=f"p{sub}@x.in")}
 
 
-async def signup(c, path="auction", files=None, who=None, **kw):
+async def signup(c, path="auction", files=None, who=None, headers=None, **kw):
     i = next(_n)
     data = {"display_name": f"Player{i}", "riot_id": f"player{i}#ZXB", "current_rank": "10", "peak_rank": "12",
             "role": "Duelist", "playstyle": "Entry fragger", "discord": f"disc{i}", "phone": "+91 98765 43210",
@@ -40,7 +40,7 @@ async def signup(c, path="auction", files=None, who=None, **kw):
     if path == "leader":
         f["logo"] = ("logo.png", img(), "image/png")
     f |= files or {}
-    return await c.post("/api/v1/signup", data=data, files=f, headers=signed_in(i if who is None else who))
+    return await c.post("/api/v1/signup", data=data, files=f, headers=headers or signed_in(i if who is None else who))
 
 
 async def queue(c, **params):
@@ -118,7 +118,7 @@ async def test_leader_cap_race_and_waitlist(c):  # TC-07, TC-08
     waiting = {p["id"] for p in (await queue(c, status="waitlisted")).values()}
     wl = next(r for r in rows[9:] if r["id"] in waiting)
     sw = await c.post(f"/api/v1/admin/players/{wl['id']}/make-auction-player", headers=c.admin)
-    assert sw.json() == {"status": "verified", "path": "auction"}
+    assert sw.json() | {"emailed": None} == {"status": "verified", "path": "auction", "emailed": None}
 
 
 async def test_duplicate_team_name_and_tag(c):  # TC-09
@@ -219,13 +219,45 @@ async def test_signup_needs_login_and_one_per_account(c):
     r = await c.post("/api/v1/signup", data=data)
     assert r.status_code == 401 and "Sign in" in r.json()["detail"]
     assert (await c.post("/api/v1/signup", data=data, headers={"cookie": "zxb_id=forged.value"})).status_code == 401
-    assert (await c.post("/api/v1/signup", data=data, headers=signed_in("acct1", "discord"))).status_code == 201
+    assert (await c.post("/api/v1/signup", data=data | {"discord": ""}, headers=signed_in("acct1"))).status_code == 201
     row = (await queue(c))["nologin#ZXB"]
-    assert row["discord"] == "discacct1" and row["signed_in_with"] == "Discord p" + "acct1@x.in"
-    again = await c.post("/api/v1/signup", data=data | {"riot_id": "other#ZXB"}, headers=signed_in("acct1", "discord"))
+    assert row["discord"] == "" and row["signed_in_with"] == "Google pacct1@x.in"
+    again = await c.post("/api/v1/signup", data=data | {"riot_id": "other#ZXB"}, headers=signed_in("acct1"))
     assert again.status_code == 409 and "already signed up" in again.json()["detail"]["errors"]["auth"]
-    me = (await c.get("/api/v1/auth/me", headers=signed_in("acct1", "discord"))).json()
-    assert me["user"]["provider"] == "discord"
+    me = (await c.get("/api/v1/auth/me", headers=signed_in("acct1"))).json()
+    assert me["user"]["provider"] == "google" and "discord" not in me["providers"]
+
+
+async def test_email_account_register_login_and_result_email(c, monkeypatch):
+    from app.modules.admin import router as admin_mod
+    sent = []
+    monkeypatch.setattr(admin_mod, "send_mail", lambda to, subject, body, html=None: sent.append((to, subject, body)) or True)
+    reg = "/api/v1/auth/register"
+    bad = (await c.post(reg, json={"name": "A", "email": "nope", "password": "short"})).json()["detail"]["errors"]
+    assert set(bad) == {"name", "email", "password"}
+    from app.modules import auth as auth_mod
+    links = []
+    monkeypatch.setattr(auth_mod, "send_mail", lambda to, subject, text, html=None: links.append(text.split("\n\n")[2]) or True)
+    r = await c.post(reg, json={"name": "Cap Tain", "email": "Cap@Example.com", "password": "hunter2hunter2"})
+    assert r.status_code == 201 and "zxb_id" in r.cookies and r.json()["emailed"]
+    unverified = {"cookie": "zxb_id=" + r.cookies["zxb_id"]}
+    assert (await c.get("/api/v1/auth/me", headers=unverified)).json()["user"]["verified"] is False
+    assert (await signup(c, "sub", headers=unverified)).status_code == 403
+    assert (await c.get("/api/v1/auth/verify?t=forged.sig")).headers["location"] == "/verified?error=1"
+    v = await c.get(links[0].replace("http://127.0.0.1:5180", ""))
+    assert v.status_code == 303 and v.headers["location"] == "/verified"
+    assert (await c.post(reg, json={"name": "Cap", "email": "cap@example.com", "password": "another-pass"})).status_code == 409
+    assert (await c.post("/api/v1/auth/login", json={"email": "cap@example.com", "password": "wrong-pass"})).status_code == 401
+    r = await c.post("/api/v1/auth/login", json={"email": "CAP@example.com", "password": "hunter2hunter2"})
+    cookie = {"cookie": "zxb_id=" + r.cookies["zxb_id"]}
+    me = (await c.get("/api/v1/auth/me", headers=cookie)).json()["user"]
+    assert me["email"] == "cap@example.com" and me["verified"] is True
+    await signup(c, "leader", riot_id="captain#ZXB", headers=cookie)
+    row = (await queue(c))["captain#ZXB"]
+    out = await verify_and_approve(c, row)
+    assert out["emailed"] is True
+    to, subject, body = sent[-1]
+    assert to == "cap@example.com" and "captain" in subject and f"/leader/{out['leader_code']}" in body
 
 
 async def test_admin_uploads_and_removes_upi_qr(c):
@@ -240,3 +272,20 @@ async def test_admin_uploads_and_removes_upi_qr(c):
     assert (await c.delete("/api/v1/admin/settings/upi-qr", headers=c.admin)).json()["upi_qr_url"] is None
     assert (await c.get("/api/v1/public")).json()["upi_qr_url"] is None
     assert (await c.get(url)).status_code == 404
+
+
+
+async def test_announcement_reaches_each_live_participant_once(c, monkeypatch):
+    from app.modules.admin import router as admin_mod
+    batches = []
+    monkeypatch.setattr(admin_mod, "send_many", lambda msgs: batches.append(msgs) or len(msgs))
+    await signup(c, "sub", who="same")
+    await signup(c, "auction", who="other")
+    body = {"subject": "Auction moved", "message": "The auction now starts at 7 pm.", "audience": "all"}
+    monkeypatch.delenv("SMTP_HOST", raising=False)
+    assert (await c.post("/api/v1/admin/announce", json=body, headers=c.admin)).status_code == 409
+    monkeypatch.setenv("SMTP_HOST", "smtp.test")
+    assert (await c.get("/api/v1/admin/announce/recipients?audience=subs", headers=c.admin)).json()["count"] == 1
+    r = await c.post("/api/v1/admin/announce", json=body, headers=c.admin)
+    assert r.json() == {"queued": 2}
+    assert sorted(m[0] for m in batches[0]) == ["pother@x.in", "psame@x.in"] and "7 pm" in batches[0][0][2]

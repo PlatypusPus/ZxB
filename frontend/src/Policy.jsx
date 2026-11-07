@@ -34,9 +34,9 @@ function Privacy() {
 
     <h2>What we collect</h2>
     <ul>
-      <li><strong>Your sign-in:</strong> when you sign in with Discord or Google, we keep your account ID and name, your Discord username, and for Google your email. We never see your password.</li>
+      <li><strong>Your sign-in:</strong> your name and email. With Google we also keep your Google account ID and never see your Google password; with an email account your password is stored only as a salted hash. We email your sign-up result to this address.</li>
       <li><strong>Your player card:</strong> display name, Riot ID, current and peak rank, role, playstyle, quote and photo.</li>
-      <li><strong>Contact details:</strong> Discord username and phone number.</li>
+      <li><strong>Contact details:</strong> phone number, and your Discord username if you give it.</li>
       <li><strong>Team leaders:</strong> team name, tag and logo.</li>
       <li><strong>Paid entries:</strong> the 12-digit UTR and a screenshot of the payment.</li>
     </ul>

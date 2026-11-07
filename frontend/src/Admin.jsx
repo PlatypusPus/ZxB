@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from './api.js'
 import { useAuction, useCountdown } from './live.js'
 
-const TABS = ['Queue', 'Teams', 'Live', 'Settings', 'Payments', 'Audit']
+const TABS = ['Queue', 'Teams', 'Live', 'Settings', 'Email', 'Payments', 'Audit']
 const PATH = { leader: 'Captain', auction: 'Auction player', sub: 'Sub (free)' }
 
 export default function Admin() {
@@ -22,6 +22,7 @@ export default function Admin() {
       {tab === 'Teams' && <Teams call={call} />}
       {tab === 'Live' && <Live call={call} token={token} />}
       {tab === 'Settings' && <Settings call={call} />}
+      {tab === 'Email' && <Announce call={call} />}
       {tab === 'Payments' && <Payments token={token} />}
       {tab === 'Audit' && <Audit call={call} />}
     </main>
@@ -72,9 +73,10 @@ function Queue({ call, token }) {
   const act = async (path, body, row) => {
     try {
       const r = await call(path, { method: 'POST', body: body || {} })
+      const mail = r.emailed === true ? ' Emailed them.' : r.emailed === false ? ' No email sent (no email on file or SMTP not set up).' : ''
       setFlash(r.leader_code
-        ? `${row.display_name} approved as captain. Send them this captain link on WhatsApp now (shown once). It lets them edit their team profile: ${location.origin}/leader/${r.leader_code}`
-        : `${row.display_name}: ${r.status || r.payment_status}`)
+        ? `${row.display_name} approved as captain.${mail} Their captain link (shown once): ${location.origin}/leader/${r.leader_code}`
+        : `${row.display_name}: ${r.status || r.payment_status}.${mail}`)
       load()
     } catch (e) { setFlash(`${row.display_name}: ${e.message}`) }
   }
@@ -331,6 +333,51 @@ function QrField({ call, name, onChange }) {
         </div>
       </div>
     </div>
+  )
+}
+
+const AUDIENCE = { all: 'Everyone signed up', captains: 'Captains', players: 'Auction players', subs: 'Sub pool', approved: 'Approved only' }
+
+// Announcements go to each live sign-up's email. Two-step send instead of a browser confirm dialog.
+function Announce({ call }) {
+  const [f, setF] = useState({ audience: 'all', subject: '', message: '' })
+  const [who, setWho] = useState(null), [armed, setArmed] = useState(false)
+  const [msg, setMsg] = useState(''), [errors, setErrors] = useState({}), [busy, setBusy] = useState(false)
+  useEffect(() => { call(`/admin/announce/recipients?audience=${f.audience}`).then(setWho).catch(() => setWho(null)) }, [f.audience])
+  const put = (k, v) => { setF(o => ({ ...o, [k]: v })); setErrors(e => ({ ...e, [k]: undefined })); setArmed(false); setMsg('') }
+  const send = async () => {
+    setBusy(true)
+    try {
+      const r = await call('/admin/announce', { method: 'POST', body: f })
+      setMsg(`Sending to ${r.queued} ${r.queued === 1 ? 'person' : 'people'}. It can take a minute.`)
+      setF(o => ({ ...o, subject: '', message: '' }))
+    } catch (e) { setErrors(e.errors || {}); setMsg(Object.keys(e.errors || {}).length ? 'Fix the fields above.' : e.message) }
+    finally { setBusy(false); setArmed(false) }
+  }
+  const n = who?.count ?? 0
+  return (
+    <form className="announce set-card" onSubmit={e => { e.preventDefault(); setArmed(true) }}>
+      <legend>Email participants</legend>
+      <p className="hint">Sent from the site's email to each person's sign-in address, with the ZenithXBeans header. Rejected and withdrawn sign-ups are skipped.</p>
+      {who && !who.smtp && <p className="err">Email isn't set up on the server yet. Add the SMTP settings to .env first.</p>}
+      <div className="field"><label htmlFor="a-aud">Send to</label>
+        <select id="a-aud" value={f.audience} onChange={e => put('audience', e.target.value)}>
+          {Object.entries(AUDIENCE).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+        <p className="hint">{who ? `${n} ${n === 1 ? 'person' : 'people'} with an email on file` : 'Counting…'}</p></div>
+      <div className="field"><label htmlFor="a-sub">Subject</label>
+        <input id="a-sub" value={f.subject} maxLength={120} aria-invalid={!!errors.subject} onChange={e => put('subject', e.target.value)} placeholder="Auction starts at 7 pm" />
+        {errors.subject && <p className="err">{errors.subject}</p>}</div>
+      <div className="field"><label htmlFor="a-msg">Message</label>
+        <textarea id="a-msg" rows="9" value={f.message} maxLength={5000} aria-invalid={!!errors.message} onChange={e => put('message', e.target.value)}
+          placeholder={'Everyone starts with "Hi <name>," automatically.\n\nLeave a blank line between paragraphs.'} />
+        {errors.message && <p className="err">{errors.message}</p>}</div>
+      {msg && <p role="status" className={msg.startsWith('Sending') ? 'ok' : 'err'}>{msg}</p>}
+      {armed
+        ? <div className="announce-confirm"><p>Send “{f.subject || 'no subject'}” to <strong>{n}</strong> {n === 1 ? 'person' : 'people'}? This can’t be undone.</p>
+            <div className="actions"><button type="button" className="btn" disabled={busy || !n} onClick={send}>{busy ? 'Sending…' : 'Send now'}</button>
+              <button type="button" className="btn ghost" onClick={() => setArmed(false)}>Cancel</button></div></div>
+        : <button className="btn" disabled={!who?.smtp || !n}>Review and send</button>}
+    </form>
   )
 }
 

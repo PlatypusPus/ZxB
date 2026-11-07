@@ -5,11 +5,14 @@ import re
 from datetime import datetime
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Request, Response, UploadFile
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...core import (ADMIN_EMAIL, ADMIN_PASSWORD_HASH, PRIVATE_DIR, PUBLIC_DIR, audit, image_name, process_image, check_password, get_db, new_token,
+import asyncio
+import os
+
+from ...core import (ADMIN_EMAIL, ADMIN_PASSWORD_HASH, PRIVATE_DIR, PUBLIC_DIR, audit, image_name, mail_html, process_image, send_mail, send_many, SITE, check_password, get_db, new_token,
                      publish, rate_limit, require_admin, sign_admin_token, utcnow)
 from ...models import AuditLog, Payment, Player, Team
 from ...tournament import approved_leaders, load, settings
@@ -114,6 +117,16 @@ async def refund_payment(payment_id: int, body: dict, db: AsyncSession = Depends
     return {"payment_status": pay.status}
 
 
+async def notify(p: Player, event_name: str, subject: str, body: str, button: tuple[str, str] | None = None) -> bool:
+    """Email the person at their sign-in email. Runs after the commit, so a mail failure never undoes a decision."""
+    text = f"Hi {p.display_name},\n\n{body}\n\n{event_name}\n{SITE}\n"
+    paras = [f"Hi {p.display_name},", *body.split("\n\n")]
+    if button:   # the link is the button in HTML, so drop its bare-URL paragraph
+        paras = [x for x in paras if x.strip() != button[1]]
+    return await asyncio.to_thread(send_mail, p.auth_email or "", f"{event_name}: {subject}", text,
+                                   mail_html(subject[:1].upper() + subject[1:], paras, button))
+
+
 @router.post("/players/{player_id}/approve")
 async def approve_player(player_id: int, db: AsyncSession = Depends(get_db), admin: str = Depends(require_admin)):
     t, _ = await load(db, lock=True)  # tournament row lock serialises approvals, so two can't take the 8th slot
@@ -128,15 +141,28 @@ async def approve_player(player_id: int, db: AsyncSession = Depends(get_db), adm
             p.status = "waitlisted"
             audit(db, admin, "player.waitlisted", player_id=p.id)
             await db.commit()
-            return {"status": p.status}
+            emailed = await notify(p, t.name, "you're on the captain waitlist",
+                                   "All captain slots are full right now, so you're on the waitlist. If a slot opens you'll "
+                                   "hear from us, or the organisers may move you into the auction player pool.")
+            return {"status": p.status, "emailed": emailed}
         team = await db.scalar(select(Team).where(Team.leader_player_id == p.id))
         access_link_code, team.access_code_hash = new_token()
     p.status = "approved"
     audit(db, admin, "player.approved", player_id=p.id, path=p.path)
     await db.commit()
     publish("player.approved", player_id=p.id)
-    # The raw leader code is shown once; send it over WhatsApp. Lost it? Approving can't repeat, use /teams/{id}/new-code.
-    return {"status": p.status, "leader_code": access_link_code}
+    # The raw leader code is shown once and emailed. Lost it? Approving can't repeat, use /teams/{id}/new-code.
+    if p.path == "leader":
+        emailed = await notify(p, t.name, "you're selected as a captain",
+                               "You've been selected as a captain. Use your private captain link to set your team name, "
+                               f"tag and logo before the auction:\n\n{SITE}/leader/{access_link_code}\n\n"
+                               "Keep this link to yourself; anyone with it can edit your team.",
+                               ("Open my captain page", f"{SITE}/leader/{access_link_code}"))
+    else:
+        emailed = await notify(p, t.name, "your sign-up is approved",
+                               "You're in the sub pool. We'll be in touch when a team needs you." if p.path == "sub" else
+                               "You're in the auction player pool. Captains will bid for you live on auction day.")
+    return {"status": p.status, "leader_code": access_link_code, "emailed": emailed}
 
 
 @router.post("/players/{player_id}/reject")
@@ -149,7 +175,12 @@ async def reject_player(player_id: int, body: dict, db: AsyncSession = Depends(g
     p.status, p.reject_reason = "rejected", reason
     audit(db, admin, "player.rejected", player_id=p.id, reason=reason)
     await db.commit()
-    return {"status": p.status}
+    t, _ = await load(db)
+    what = "as a captain" if p.path == "leader" else "for this event"
+    emailed = await notify(p, t.name, "sign-up not accepted",
+                           f"Sorry, your sign-up {what} wasn't accepted.\n\nReason: {reason}\n\n"
+                           "Message the organisers if you have questions.")
+    return {"status": p.status, "emailed": emailed}
 
 
 @router.post("/players/{player_id}/withdraw")
@@ -176,7 +207,11 @@ async def leader_to_player(player_id: int, db: AsyncSession = Depends(get_db), a
         p.status = "verified" if pay.status == "verified" else "submitted"
     audit(db, admin, "player.switched_to_auction", player_id=p.id)
     await db.commit()
-    return {"status": p.status, "path": p.path}
+    t, _ = await load(db)
+    emailed = await notify(p, t.name, "you weren't selected as a captain",
+                           "You weren't selected as a captain this time, so you've been moved into the auction player "
+                           "pool. Captains will bid for you live on auction day.")
+    return {"status": p.status, "path": p.path, "emailed": emailed}
 
 
 @router.post("/teams/{team_id}/approve-profile")
@@ -312,3 +347,50 @@ async def payments_csv(db: AsyncSession = Depends(get_db), admin: str = Depends(
 async def audit_log(db: AsyncSession = Depends(get_db), admin: str = Depends(require_admin), limit: int = 200):
     rows = await db.scalars(select(AuditLog).order_by(AuditLog.id.desc()).limit(min(limit, 1000)))
     return [{"id": a.id, "actor": a.actor, "action": a.action, "payload": a.payload, "at": a.created_at} for a in rows]
+
+
+
+# ---------- announcements by email
+
+AUDIENCES = {"all": {}, "captains": {"path": "leader"}, "players": {"path": "auction"}, "subs": {"path": "sub"},
+             "approved": {"status": "approved"}}
+
+
+async def audience_emails(db: AsyncSession, audience: str) -> dict[str, str]:
+    if audience not in AUDIENCES:
+        raise HTTPException(422, {"errors": {"audience": "Pick who gets it"}})
+    q = select(Player.auth_email, Player.display_name).where(
+        Player.auth_email.is_not(None), Player.status.not_in(["rejected", "withdrawn"]))
+    for col, val in AUDIENCES[audience].items():
+        q = q.where(getattr(Player, col) == val)
+    return {e.lower(): n for e, n in (await db.execute(q)).all()}   # one email per address
+
+
+@router.get("/announce/recipients")
+async def announce_recipients(audience: str = "all", db: AsyncSession = Depends(get_db),
+                              admin: str = Depends(require_admin)):
+    return {"count": len(await audience_emails(db, audience)), "smtp": bool(os.environ.get("SMTP_HOST"))}
+
+
+@router.post("/announce")
+async def announce(body: dict, tasks: BackgroundTasks, db: AsyncSession = Depends(get_db),
+                   admin: str = Depends(require_admin)):
+    subject, message = str(body.get("subject", "")).strip(), str(body.get("message", "")).strip()
+    e = {}
+    if not 3 <= len(subject) <= 120:
+        e["subject"] = "3 to 120 characters"
+    if not 10 <= len(message) <= 5000:
+        e["message"] = "10 to 5000 characters"
+    if e:
+        raise HTTPException(422, {"errors": e})
+    if not os.environ.get("SMTP_HOST"):
+        raise HTTPException(409, "Email isn't set up on the server yet (SMTP_HOST in .env)")
+    people = await audience_emails(db, str(body.get("audience", "all")))
+    t, _ = await load(db)
+    paras = message.split("\n\n")
+    msgs = [(email, f"{t.name}: {subject}", f"Hi {name},\n\n{message}\n\n{t.name}\n{SITE}\n",
+             mail_html(subject, [f"Hi {name},", *paras], ("Open the site", SITE))) for email, name in people.items()]
+    audit(db, admin, "announcement.sent", audience=body.get("audience", "all"), subject=subject, recipients=len(msgs))
+    await db.commit()
+    tasks.add_task(send_many, msgs)   # runs after the response, in a worker thread
+    return {"queued": len(msgs)}

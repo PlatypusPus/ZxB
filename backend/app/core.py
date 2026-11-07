@@ -1,11 +1,15 @@
 """Shared plumbing: settings, DB session, event bus, audit, auth, rate limits, image uploads."""
 import hashlib
+import html
 import hmac
 import io
 import os
+import logging
 import secrets
+import smtplib
 import time
 from collections import defaultdict, deque
+from email.message import EmailMessage
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -132,3 +136,58 @@ def process_image(raw: bytes, field: str, square: bool) -> bytes:
 
 def image_name() -> str:
     return secrets.token_hex(16) + ".webp"
+
+
+# --- Email (stdlib smtplib). Without SMTP_HOST nothing is sent and callers report that to the admin.
+SITE = os.environ.get("PUBLIC_URL", "https://zxb.shov.in").rstrip("/")
+
+
+def mail_html(heading: str, paragraphs: list[str], button: tuple[str, str] | None = None) -> str:
+    """Branded HTML email. Inline styles and tables only, because that's what mail apps render reliably."""
+    e = html.escape
+    paras = "".join(f'<p style="margin:0 0 16px;font:16px/1.55 Arial,Helvetica,sans-serif;color:#d9d6cf">'
+                    f'{e(p).replace(chr(10), "<br>")}</p>' for p in paragraphs if p)
+    btn = button and (f'<p style="margin:8px 0 0"><a href="{e(button[1])}" style="display:inline-block;background:#ff3d8b;'
+                      f'color:#0b0b0d;font:bold 15px Arial,Helvetica,sans-serif;letter-spacing:1px;text-transform:uppercase;'
+                      f'text-decoration:none;padding:14px 28px">{e(button[0])}</a></p>')
+    return f"""<!doctype html><html><body style="margin:0;padding:32px 12px;background:#0b0b0d">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#16161a;border:1px solid #2a2a30">
+<tr><td style="padding:22px 32px;border-bottom:4px solid #ff3d8b"><img src="{SITE}/zxb-logo.png" alt="ZenithXBeans" height="40" style="display:block;height:40px;width:auto"></td></tr>
+<tr><td style="padding:32px"><h1 style="margin:0 0 20px;font:bold 28px/1.15 Arial,Helvetica,sans-serif;color:#f4f1ea;text-transform:uppercase">{e(heading)}</h1>{paras}{btn or ""}</td></tr>
+<tr><td style="padding:18px 32px;border-top:1px solid #2a2a30;font:13px/1.5 Arial,Helvetica,sans-serif;color:#8a8790">ZenithXBeans · Community tournaments<br><a href="{SITE}" style="color:#ffb547">{e(SITE.split("//")[-1])}</a></td></tr>
+</table></td></tr></table></body></html>"""
+
+
+def send_many(msgs: list[tuple[str, str, str, str | None]]) -> int:
+    """(to, subject, text, html) over one SMTP connection. Returns how many were accepted.
+    ponytail: sequential on one connection; add a queue if mailing lists grow past a few hundred."""
+    host, msgs = os.environ.get("SMTP_HOST"), [m for m in msgs if m[0]]
+    if not host or not msgs:
+        return 0
+    port, sent = int(os.environ.get("SMTP_PORT", "587")), 0
+    try:
+        with (smtplib.SMTP_SSL(host, port, timeout=20) if port == 465 else smtplib.SMTP(host, port, timeout=20)) as s:
+            if port != 465:
+                s.starttls()
+            if os.environ.get("SMTP_USER"):
+                s.login(os.environ["SMTP_USER"], os.environ.get("SMTP_PASSWORD", ""))
+            for to, subject, text, html_body in msgs:
+                msg = EmailMessage()
+                msg["From"] = os.environ.get("SMTP_FROM") or os.environ.get("SMTP_USER", "")
+                msg["To"], msg["Subject"] = to, subject
+                msg.set_content(text)
+                if html_body:
+                    msg.add_alternative(html_body, subtype="html")
+                try:
+                    s.send_message(msg)
+                    sent += 1
+                except smtplib.SMTPRecipientsRefused:
+                    logging.warning("Email to %s refused", to)
+    except Exception:
+        logging.exception("SMTP stopped after %d of %d emails", sent, len(msgs))
+    return sent
+
+
+def send_mail(to: str, subject: str, text: str, html_body: str | None = None) -> bool:
+    return send_many([(to, subject, text, html_body)]) == 1

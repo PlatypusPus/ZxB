@@ -47,15 +47,16 @@ ssh core@acrossthe.cloud 'cd ~/shovin/zxb && git pull && (cd backend && ~/.local
 ```
 First-time root steps (Postgres role/db, Caddy site): `sudo bash ~/shovin/zxb/deploy/root-setup.sh`. Secrets live in `~/shovin/zxb/.env` (see `.env.example`); uploads in `~/shovin/zxb-data/uploads`.
 
-## Sign-in for registration (Discord and Google)
+## Sign-in for registration (Google or email)
 
-Registering requires signing in with Discord or Google, one live sign-up per account. Each provider needs an app:
+Registering requires an account, one live sign-up per account: either Google, or an email and password. Email
+accounts must click a verification link before they can register. Either way the email is where results go.
 
-- **Discord:** discord.com/developers/applications, New Application, then OAuth2. Copy the Client ID and Client Secret,
-  and add the redirect `https://zxb.shov.in/api/v1/auth/discord/callback`.
 - **Google:** console.cloud.google.com, APIs & Services, Credentials, Create OAuth client ID (Web application).
   Add the redirect `https://zxb.shov.in/api/v1/auth/google/callback`. Configure the consent screen and publish it.
+- **Email (SMTP):** set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` and `SMTP_FROM` (see `.env.example`).
+  With Gmail, turn on 2-step verification and create an app password. Without SMTP, email accounts can't verify,
+  approvals send no email, and the admin Email tab is disabled.
 
-Put `PUBLIC_URL`, `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in the
-server `.env`, then `pm2 restart zxb --update-env`. A provider without credentials simply doesn't show a button.
-For local testing, `AUTH_DEV=1` in `.env` adds a fake "Dev login" button. Never set it in production.
+After editing the server `.env`, run `pm2 restart zxb --update-env`. For local testing, `AUTH_DEV=1` adds a fake
+"Dev login" button and prints verification links to the server log. Never set it in production.

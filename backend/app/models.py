@@ -159,3 +159,14 @@ class Sale(Base):
     price: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = created()
     undone_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Account(Base):
+    """Email + password sign-in, for people who don't want to use Google."""
+    __tablename__ = "account"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(254), unique=True)
+    name: Mapped[str] = mapped_column(String(64))
+    password_hash: Mapped[str] = mapped_column(String(200))
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = created()

@@ -112,8 +112,8 @@ def validate_profile(d: dict, cfg: dict) -> dict:
         e["playstyle"] = "Describe your playstyle in up to 80 characters"
     if len(d["quote"]) > 80:
         e["quote"] = "Keep it to 80 characters"
-    if not 2 <= len(d["discord"]) <= 37:
-        e["discord"] = "Enter your Discord username"
+    if len(d["discord"]) > 37:
+        e["discord"] = "Discord usernames are at most 37 characters"
     if not re.fullmatch(r"[6-9]\d{9}", d["phone"]):
         e["phone"] = "Enter a 10-digit Indian mobile number"
     return e

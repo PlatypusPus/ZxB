@@ -1,22 +1,31 @@
-"""Sign in with Discord or Google before registering.
+"""Sign in with Google, or an email and password, before registering.
 
-Standard OAuth 2.0 authorization-code flow. The provider's answer becomes a short-lived signed cookie
+Google uses the OAuth 2.0 authorization-code flow. Either way the result is a short-lived signed cookie
 (`zxb_id`) holding who the person is; POST /signup requires it, so each account can hold one live sign-up.
+Every account has an email, which is where selection results are sent.
 """
 import asyncio
 import base64
+import logging
 import hmac
 import json
 import os
+import re
 import secrets
 import time
 import urllib.parse
 import urllib.request
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
-from ..core import SECRET_KEY
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..core import SECRET_KEY, check_password, get_db, hash_password, mail_html, rate_limit, send_mail, utcnow
+from ..models import Account
+from ..tournament import load
 
 router = APIRouter()
 PUBLIC_URL = os.environ.get("PUBLIC_URL", "http://127.0.0.1:5180").rstrip("/")
@@ -25,12 +34,6 @@ COOKIE, STATE_COOKIE = "zxb_id", "zxb_oauth_state"
 ID_HOURS = 6
 
 PROVIDERS = {
-    "discord": {
-        "authorize": "https://discord.com/oauth2/authorize",
-        "token": "https://discord.com/api/oauth2/token",
-        "me": "https://discord.com/api/users/@me",
-        "scope": "identify",
-    },
     "google": {
         "authorize": "https://accounts.google.com/o/oauth2/v2/auth",
         "token": "https://oauth2.googleapis.com/token",
@@ -74,8 +77,8 @@ def _unsign(purpose: str, value: str) -> dict | None:
     return data if data.get("exp", 0) > time.time() else None
 
 
-def issue_identity(provider: str, sub: str, name: str, discord: str = "", email: str = "") -> str:
-    return _sign("id", {"provider": provider, "sub": sub, "name": name, "discord": discord, "email": email}, ID_HOURS)
+def issue_identity(provider: str, sub: str, name: str, email: str = "") -> str:
+    return _sign("id", {"provider": provider, "sub": sub, "name": name, "email": email}, ID_HOURS)
 
 
 def identity(request: Request) -> dict | None:
@@ -85,7 +88,7 @@ def identity(request: Request) -> dict | None:
 def require_identity(request: Request) -> dict:
     who = identity(request)
     if not who:
-        raise HTTPException(401, "Sign in with Discord or Google to register")
+        raise HTTPException(401, "Sign in with Google or your email to register")
     return who
 
 
@@ -106,8 +109,6 @@ async def fetch_profile(provider: str, code: str) -> dict:
         "grant_type": "authorization_code", "code": code, "redirect_uri": redirect_uri(provider),
         "client_id": cid, "client_secret": secret})
     me = await asyncio.to_thread(_call, cfg["me"], None, tok["access_token"])
-    if provider == "discord":
-        return {"sub": me["id"], "name": me.get("global_name") or me["username"], "discord": me["username"]}
     if not me.get("email_verified"):
         raise HTTPException(403, "Verify your Google email first")
     return {"sub": me["sub"], "name": me.get("name") or me["email"], "email": me["email"]}
@@ -129,12 +130,12 @@ def _set_identity(resp, value: str):
 async def start(provider: str, request: Request):
     if provider == "dev" and "dev" in enabled():
         n = secrets.token_hex(3)
-        return _set_identity(_back(request), issue_identity("dev", n, f"Dev {n}", discord=f"dev{n}"))
+        return _set_identity(_back(request), issue_identity("dev", n, f"Dev {n}", email=f"dev{n}@example.com"))
     if provider not in PROVIDERS or not creds(provider):
         raise HTTPException(404, "This sign-in option isn't set up")
     state = secrets.token_urlsafe(24)
     q = {"client_id": creds(provider)[0], "redirect_uri": redirect_uri(provider), "response_type": "code",
-         "scope": PROVIDERS[provider]["scope"], "state": state, "prompt": "select_account" if provider == "google" else "none"}
+         "scope": PROVIDERS[provider]["scope"], "state": state, "prompt": "select_account"}
     resp = RedirectResponse(PROVIDERS[provider]["authorize"] + "?" + urllib.parse.urlencode(q), 303)
     # The state cookie ties the callback to this browser, which blocks login CSRF.
     resp.set_cookie(STATE_COOKIE, _sign("state", {"s": state, "p": provider}, 0.25), max_age=900,
@@ -159,10 +160,65 @@ async def callback(provider: str, request: Request, code: str = "", state: str =
     return _set_identity(_back(request), issue_identity(provider, **prof))
 
 
+async def is_verified(db: AsyncSession, who: dict) -> bool:
+    """Google already verifies emails; email accounts must click the link we send."""
+    if who.get("provider") != "email":
+        return True
+    acct = await db.get(Account, int(who["sub"]))
+    return bool(acct and acct.verified_at)
+
+
 @router.get("/auth/me")
-async def me(request: Request):
+async def me(request: Request, db: AsyncSession = Depends(get_db)):
     who = identity(request)
-    return {"providers": enabled(), "user": who and {k: who[k] for k in ("provider", "name", "discord", "email")}}
+    user = who and {k: who.get(k, "") for k in ("provider", "name", "email")}
+    if user:
+        user["verified"] = await is_verified(db, who)
+    return {"providers": enabled(), "user": user}
+
+
+# ---------- email + password accounts
+
+EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]+\.[^@\s]{2,}$")
+
+
+def _account_input(body: dict) -> tuple[str, str]:
+    return str(body.get("email", "")).strip().lower(), str(body.get("password", ""))
+
+
+@router.post("/auth/register")
+async def register(body: dict, request: Request, db: AsyncSession = Depends(get_db)):
+    rate_limit(request, "register", 10, 600)
+    email, pw = _account_input(body)
+    name, e = str(body.get("name", "")).strip(), {}
+    if not 2 <= len(name) <= 64:
+        e["name"] = "Enter your name"
+    if len(email) > 254 or not EMAIL.match(email):
+        e["email"] = "Enter a valid email; your result is sent here"
+    if not 8 <= len(pw) <= 128:
+        e["password"] = "Use at least 8 characters"
+    if e:
+        raise HTTPException(422, {"errors": e})
+    acct = Account(email=email, name=name, password_hash=await asyncio.to_thread(hash_password, pw))
+    db.add(acct)
+    try:
+        await db.commit()
+    except IntegrityError:
+        raise HTTPException(409, {"errors": {"email": "This email already has an account. Log in instead."}})
+    emailed = await send_verification(db, acct)
+    return _set_identity(JSONResponse({"ok": True, "emailed": emailed}, 201), issue_identity("email", str(acct.id), name, email=email))
+
+
+@router.post("/auth/login")
+async def login(body: dict, request: Request, db: AsyncSession = Depends(get_db)):
+    rate_limit(request, "login", 10, 600)
+    email, pw = _account_input(body)
+    acct = await db.scalar(select(Account).where(Account.email == email))
+    # Same answer and similar work whether or not the email exists, so it can't be used to probe accounts.
+    ok = await asyncio.to_thread(check_password, pw, acct.password_hash if acct else hash_password("x"))
+    if not acct or not ok:
+        raise HTTPException(401, "Wrong email or password")
+    return _set_identity(JSONResponse({"ok": True}), issue_identity("email", str(acct.id), acct.name, email=acct.email))
 
 
 @router.post("/auth/logout")
@@ -170,3 +226,46 @@ async def logout():
     resp = JSONResponse({"ok": True})
     resp.delete_cookie(COOKIE, path="/")
     return resp
+
+
+
+# ---------- email verification
+
+VERIFY_HOURS = 48
+
+
+async def send_verification(db: AsyncSession, acct: Account) -> bool:
+    t, _ = await load(db)
+    link = f"{PUBLIC_URL}/api/v1/auth/verify?t={_sign('verify', {'a': acct.id, 'e': acct.email}, VERIFY_HOURS)}"
+    lines = [f"Hi {acct.name},", f"Confirm this is your email to finish signing up for {t.name}. "
+             "Your selection result and event announcements will be sent here.",
+             f"The link works for {VERIFY_HOURS} hours. If you didn't make an account, ignore this email."]
+    ok = await asyncio.to_thread(send_mail, acct.email, f"{t.name}: verify your email",
+                                 "\n\n".join(lines[:2] + [link] + lines[2:]),
+                                 mail_html("Verify your email", lines, ("Verify my email", link)))
+    if not ok and os.environ.get("AUTH_DEV") == "1":
+        logging.warning("Dev verification link for %s: %s", acct.email, link)
+    return ok
+
+
+@router.get("/auth/verify")
+async def verify(t: str = "", db: AsyncSession = Depends(get_db)):
+    data = _unsign("verify", t)
+    acct = data and await db.get(Account, data.get("a"))
+    if not acct or acct.email != data.get("e"):
+        return RedirectResponse("/verified?error=1", 303)
+    if not acct.verified_at:
+        acct.verified_at = utcnow()
+        await db.commit()
+    # Also signs them in, so a link opened on another device still lands on a working sign-up.
+    return _set_identity(RedirectResponse("/verified", 303), issue_identity("email", str(acct.id), acct.name, email=acct.email))
+
+
+@router.post("/auth/resend")
+async def resend(request: Request, db: AsyncSession = Depends(get_db)):
+    who = require_identity(request)
+    rate_limit(request, "resend", 3, 600)
+    acct = who["provider"] == "email" and await db.get(Account, int(who["sub"]))
+    if not acct or acct.verified_at:
+        return {"emailed": False, "verified": True}
+    return {"emailed": await send_verification(db, acct), "verified": False}

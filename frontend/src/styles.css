@@ -491,8 +491,6 @@ h1.hero-logo { max-width: 860px; width: 100%; margin: 0 auto; justify-content: c
 .signin .lede { margin: 0; max-width: 52ch; }
 .signin-options { display: grid; gap: 12px; width: min(100%, 420px); }
 .signin-options .btn { text-align: center; }
-.signin-discord { background: #5865f2; border-color: #5865f2; color: #fff; }
-.signin-discord:hover { background: #4752c4; border-color: #4752c4; }
 .signin-google { background: var(--ink); border-color: var(--ink); color: var(--base); }
 .signin-google:hover { background: #fff; border-color: #fff; }
 .signed-in { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 var(--t); }
@@ -544,3 +542,20 @@ input[type=datetime-local] { color-scheme: dark; }
 .qr-empty { display: grid; place-items: center; background: var(--base); color: var(--muted); font-size: 14px; }
 .qr-actions { display: grid; gap: 8px; justify-items: start; flex: 1; min-width: 180px; }
 .qr-actions label.btn { cursor: pointer; }
+
+.signin-or { margin: -8px 0; font-size: 14px; }
+.signin-form { display: grid; gap: 4px; width: min(100%, 420px); background: var(--card); border: 1px solid var(--line); padding: var(--t); }
+.signin-form > .btn { margin-top: 8px; }
+.signin-tabs { display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 12px; border: 1px solid var(--line); }
+.signin-tabs button { font: 700 13px var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); background: transparent; border: 0; min-height: 44px; cursor: pointer; }
+.signin-tabs button.on { background: var(--ink); color: var(--base); }
+
+/* Admin: announcements */
+.announce { max-width: 760px; }
+.announce .ok { color: var(--amber); font-weight: 600; margin: 0; }
+textarea { font: 16px/1.5 var(--body); color: var(--ink); background: var(--base); border: 1px solid var(--line); padding: 10px 12px; width: 100%; resize: vertical; }
+textarea:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
+.announce-confirm { border: 1px solid var(--pink); padding: var(--t); display: grid; gap: 12px; }
+.announce-confirm p, .announce-confirm .actions { margin: 0; }
+.notfound .display { font-size: clamp(56px, 10vw, 128px); }
+.signin .actions { flex-wrap: wrap; } .signin .actions .btn { white-space: nowrap; }

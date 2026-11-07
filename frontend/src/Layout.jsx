@@ -12,7 +12,7 @@ export function Logo() {
   )
 }
 
-const LINKS = [['/', 'Home'], ['/#tournaments', 'Tournaments'], ['/draft', 'Valorant Auction'], ['/projector', 'Live auction']]
+const LINKS = [['/', 'Home'], ['/#tournaments', 'Tournaments'], ['/draft', 'Valorant Auction']]
 
 export function Nav({ info }) {
   const [open, setOpen] = useState(false)
@@ -59,8 +59,42 @@ export function Count({ value, prefix = '' }) {
 }
 
 // Leader slots as tiles: red = taken, outlined = still open.
+// ponytail: fixed schedule for this event; move into settings when there is a second tournament.
+const SCHEDULE = [
+  ['11', 'Wed', 'Auction', 'Leaders bid on registered players. Unsold players go again at half price.', ''],
+  ['12–16', 'Thu–Mon', 'Group stage', '10 teams in 2 groups of 5, single round robin. Both groups play 2 matches a day; each team plays 4 and has one bye day.', 'BO1'],
+  ['17', 'Tue', 'Buffer day', 'Kept free for reschedules.', ''],
+  ['18', 'Wed', 'Upper bracket round 1', 'Top 3 from each group qualify.', 'BO3'],
+  ['19', 'Thu', 'Lower bracket round 1', '', 'BO3'],
+  ['20', 'Fri', 'Upper semifinals + lower round 2', 'Seeds 1 and 2 join here.', 'BO3'],
+  ['21', 'Sat', 'Upper final + lower final', '', 'BO3'],
+  ['22', 'Sun', 'Grand final', '', 'BO5'],
+]
+const SEEDS = ['Group A winner', 'Group B winner', 'Group A runner-up', 'Group B runner-up', 'Group A 3rd', 'Group B 3rd']
+
+export function Schedule() {
+  return (
+    <div className="schedule">
+      <ol className="sched" aria-label="November 2026 schedule">
+        {SCHEDULE.map(([d, day, h, p, fmt]) => (
+          <li key={h} data-build>
+            <span className="sched-date"><b className="digits">{d}</b><span className="mono muted">NOV · {day.toUpperCase()}</span></span>
+            <span><strong>{h}</strong>{p && <span className="muted"> {p}</span>}</span>
+            {fmt && <span className="tag ghost">{fmt}</span>}
+          </li>
+        ))}
+      </ol>
+      <section className="seeds" aria-labelledby="seeds-h">
+        <h3 id="seeds-h">Playoff seeding</h3>
+        <ol>{SEEDS.map((s, i) => <li key={s}><b className="digits">{i + 1}</b> {s}</li>)}</ol>
+        <p className="muted">Seeds 1 and 2 get byes to the upper semifinals. Seeds 5 and 6 start in the lower bracket.</p>
+      </section>
+    </div>
+  )
+}
+
 export function SlotMeter({ info }) {
-  const total = info?.teams ?? 8, left = info?.leader_slots_left ?? total
+  const total = info?.teams ?? 10, left = info?.leader_slots_left ?? total
   return (
     <div className="meter">
       <p className="mono muted">LEADER SLOTS</p>

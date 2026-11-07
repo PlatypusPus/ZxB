@@ -60,7 +60,7 @@ const focusFirst = e => requestAnimationFrame(() => {
 
 export default function Signup() {
   const [info, setInfo] = useState(null)
-  const [v, setV] = useState({ ...EMPTY, path: new URLSearchParams(location.search).get('path') === 'leader' ? 'leader' : 'auction', ...saved.v })
+  const [v, setV] = useState({ ...EMPTY, path: ['leader', 'sub'].includes(new URLSearchParams(location.search).get('path')) ? new URLSearchParams(location.search).get('path') : 'auction', ...saved.v })
   const [files, setFiles] = useState({})
   const [errors, setErrors] = useState({})
   const [step, setStep] = useState(saved.step || 0)
@@ -92,17 +92,18 @@ export default function Signup() {
     requestAnimationFrame(() => document.querySelector('.signup-form h1')?.focus())
   }
 
+  const free = v.path === 'sub'
   const submit = async ev => {
     ev.preventDefault()
     if (step < 2) return next()
     const e = {}
-    if (!/^\d{12}$/.test(v.utr.replace(/\s/g, ''))) e.utr = 'Enter the 12-digit UTR from your UPI app'
-    if (!files.screenshot) e.screenshot = 'Upload the payment screenshot'
+    if (!free && !/^\d{12}$/.test(v.utr.replace(/\s/g, ''))) e.utr = 'Enter the 12-digit UTR from your UPI app'
+    if (!free && !files.screenshot) e.screenshot = 'Upload the payment screenshot'
     if (!v.terms) e.terms = 'Tick this to continue'
     if (Object.keys(e).length) { setErrors(e); return focusFirst(e) }
     const form = new FormData()
-    Object.entries(v).forEach(([k, val]) => form.append(k, val))
-    Object.entries(files).forEach(([k, o]) => o && form.append(k, o.f))
+    Object.entries(v).forEach(([k, val]) => !(free && k === 'utr') && form.append(k, val))
+    Object.entries(files).forEach(([k, o]) => o && !(free && k === 'screenshot') && (k !== 'logo' || v.path === 'leader') && form.append(k, o.f))
     setBusy(true); setMsg('')
     try {
       const r = await api('/signup', { method: 'POST', form })
@@ -122,7 +123,7 @@ export default function Signup() {
     return (
       <main className="wrap narrow">
         <h1 className="display">You're signed up</h1>
-        <p>Status: <strong>{done.status === 'waitlisted' ? 'Waitlisted (leader slots full)' : 'Payment submitted'}</strong>. An organiser will verify your payment and rank.</p>
+        <p>Status: <strong>{done.status === 'waitlisted' ? 'Waitlisted (leader slots full)' : free ? 'In the sub pool' : 'Payment submitted'}</strong>. {free ? 'An organiser will check your rank.' : 'An organiser will verify your payment and rank.'}</p>
         <div className="card">
           <p><strong>Save your edit link.</strong> It's the only way to check your status or change your sign-up.</p>
           <p className="mono break">{link}</p>
@@ -142,7 +143,7 @@ export default function Signup() {
         <h1 className="display" tabIndex={-1}>Sign up</h1>
         {already && <p className="note">You've already signed up on this device. <a href={`/status/${already}`}>Check your status</a> instead of paying twice.</p>}
         <ol className="steps mono" aria-label="Progress">
-          {['Profile', 'Path', 'Payment'].map((s, i) => <li key={s} aria-current={i === step ? 'step' : undefined} className={i <= step ? 'on' : ''}>{i + 1}. {s}</li>)}
+          {['Profile', 'Path', free ? 'Confirm' : 'Payment'].map((s, i) => <li key={s} aria-current={i === step ? 'step' : undefined} className={i <= step ? 'on' : ''}>{i + 1}. {s}</li>)}
         </ol>
         {msg && <p className="err" role="alert">{msg}</p>}
 
@@ -159,6 +160,10 @@ export default function Signup() {
             <label className={'card choice' + (v.path === 'auction' ? ' on' : '')}>
               <input type="radio" name="path" checked={v.path === 'auction'} onChange={() => set('path', 'auction')} />
               <strong>Auction player</strong><span className="muted">Leaders bid for you live.</span>
+            </label>
+            <label className={'card choice' + (v.path === 'sub' ? ' on' : '')}>
+              <input type="radio" name="path" checked={v.path === 'sub'} onChange={() => set('path', 'sub')} />
+              <strong>Sub pool · free</strong><span className="muted">Not auctioned. Fill in when a team is a player short.</span>
             </label>
             {leaderOpen && (
               <label className={'card choice' + (v.path === 'leader' ? ' on' : '')}>
@@ -177,7 +182,13 @@ export default function Signup() {
           </>}
         </>}
 
+        {step === 2 && free && <section className="card pay">
+          <h2 className="pay-amount"><span className="digits">₹0</span> <span>Sub pool</span></h2>
+          <p>No payment. You aren't auctioned. When a team is a player short, organisers call a sub in from this pool.</p>
+          <p>If the team you sub for wins the tournament, you get the prize share of the teammate you replaced, for the matches you played.</p>
+        </section>}
         {step === 2 && <>
+          {!free && <>
           <section className="card pay" aria-labelledby="pay-h">
             <h2 id="pay-h" className="pay-amount"><span className="digits">₹{info?.fee ?? 300}</span> <span>by UPI</span></h2>
             <ol className="pay-steps">
@@ -195,6 +206,7 @@ export default function Signup() {
           <Field label="Payment screenshot" name="screenshot" required err={errors.screenshot} hint="Max 2 MB. Only organisers can see it.">
             {id => <input id={id} type="file" accept="image/png,image/jpeg,image/webp" onChange={e => setFile('screenshot', e.target.files[0])} />}
           </Field>
+          </>}
           <div className="field">
             <label className="check">
               <input id="f-terms" type="checkbox" checked={v.terms} onChange={e => set('terms', e.target.checked)} aria-describedby={errors.terms ? 'terms-e' : undefined} />
@@ -206,7 +218,7 @@ export default function Signup() {
 
         <div className="actions">
           {step > 0 && <button type="button" className="btn ghost" onClick={() => setStep(step - 1)}>Back</button>}
-          <button className="btn" disabled={busy || (step === 2 && !info?.upi_id)}>{step < 2 ? 'Next' : busy ? 'Submitting…' : 'Submit sign-up'}</button>
+          <button className="btn" disabled={busy || (step === 2 && !free && !info?.upi_id)}>{step < 2 ? 'Next' : busy ? 'Submitting…' : 'Submit sign-up'}</button>
         </div>
       </form>
 

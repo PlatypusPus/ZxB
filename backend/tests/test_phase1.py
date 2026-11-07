@@ -95,22 +95,22 @@ async def test_edit_after_close(c):  # TC-06
 
 
 async def test_leader_cap_race_and_waitlist(c):  # TC-07, TC-08
-    for _ in range(9):
+    for _ in range(11):  # 10 team slots + 1 too many
         assert (await signup(c, path="leader")).status_code == 201
     rows = list((await queue(c)).values())
-    for row in rows[:7]:
+    for row in rows[:9]:
         assert (await verify_and_approve(c, row))["status"] == "approved"
-    for row in rows[7:]:
+    for row in rows[9:]:
         await c.post(f"/api/v1/admin/payments/{row['payment']['id']}/verify", headers=c.admin)
     results = await asyncio.gather(*(c.post(f"/api/v1/admin/players/{r['id']}/approve", headers=c.admin)
-                                     for r in rows[7:]))
+                                     for r in rows[9:]))
     assert sorted(r.json()["status"] for r in results) == ["approved", "waitlisted"]
     assert (await c.get("/api/v1/public")).json()["leader_slots_left"] == 0
-    r = await signup(c, path="leader")  # 10th leader via a direct API call
+    r = await signup(c, path="leader")  # 12th leader via a direct API call
     assert r.status_code == 201 and r.json()["status"] == "waitlisted"
     # a waitlisted, paid leader can switch to the auction pool
     waiting = {p["id"] for p in (await queue(c, status="waitlisted")).values()}
-    wl = next(r for r in rows[7:] if r["id"] in waiting)
+    wl = next(r for r in rows[9:] if r["id"] in waiting)
     sw = await c.post(f"/api/v1/admin/players/{wl['id']}/make-auction-player", headers=c.admin)
     assert sw.json() == {"status": "verified", "path": "auction"}
 
@@ -190,3 +190,18 @@ async def test_admin_auth_and_privacy(c):  # TC-31, TC-33
 async def test_signup_rate_limit(c):  # TC-34
     signup_mod.SIGNUP_LIMIT = (2, 600)
     assert [(await signup(c)).status_code for _ in range(3)] == [201, 201, 429]
+
+
+async def test_sub_pool_is_free_and_never_auctioned(c):
+    data = {"display_name": "Subby", "riot_id": "subby#ZXB", "current_rank": "10", "peak_rank": "12", "role": "Flex",
+            "playstyle": "Fills any role", "discord": "subby", "phone": "+91 98765 43210", "path": "sub", "terms": "true"}
+    r = await c.post("/api/v1/signup", data=data)          # no UTR, no screenshot
+    assert r.status_code == 201, r.text
+    assert r.json()["status"] == "verified"
+    row = (await queue(c))["subby#ZXB"]
+    assert row["payment"]["amount"] == 0 and row["payment"]["status"] == "verified"
+    me = (await c.get(f"/api/v1/signup/{r.json()['edit_token']}")).json()
+    assert me["editable"] is True
+    ok = await c.post(f"/api/v1/admin/players/{row['id']}/approve", headers=c.admin)   # rank check still needed
+    assert ok.json()["status"] == "approved"
+    assert all(p["riot_id"] != "subby#ZXB" for p in (await c.get("/api/v1/players")).json())

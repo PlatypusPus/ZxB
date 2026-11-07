@@ -28,6 +28,6 @@ export const STATUS_TEXT = {
   verified: ['Payment verified', 'Your ₹300 is confirmed. Next we check your rank on tracker.gg.'],
   approved: ['Approved', "You're in. Leaders get their access link on WhatsApp; players enter the auction pool."],
   rejected: ['Rejected', 'See the reason below. Message the organisers if you think this is a mistake.'],
-  waitlisted: ['Waitlisted', 'All 8 leader slots are taken. You can switch to auction player, or wait in case a leader drops out.'],
+  waitlisted: ['Waitlisted', 'All leader slots are taken. You can switch to auction player, or wait in case a leader drops out.'],
   withdrawn: ['Withdrawn', 'You have pulled out of the tournament. Refunds follow the refund policy.'],
 }

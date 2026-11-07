@@ -99,7 +99,7 @@ function Queue({ call, token }) {
                   <td>{r.current_rank}<br /><span className="muted">peak {r.peak_rank}</span><br />{r.role}</td>
                   <td>{r.path}{r.team && <><br /><span className="muted">{r.team.name} [{r.team.tag}]</span></>}</td>
                   <td className="mono">{pay.utr}<br />₹{pay.amount} · {pay.status}</td>
-                  <td><Shot name={pay.screenshot} token={token} /></td>
+                  <td>{pay.screenshot ? <Shot name={pay.screenshot} token={token} /> : <span className="muted">Free sub</span>}</td>
                   <td>{r.status}{r.reject_reason && <><br /><span className="muted small">{r.reject_reason}</span></>}</td>
                   <td className="acts">
                     <input placeholder="Reason / note" aria-label={`Reason for ${r.display_name}`} value={note[r.id] || ''} onChange={e => setNote({ ...note, [r.id]: e.target.value })} />

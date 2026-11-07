@@ -27,7 +27,7 @@ export default function Status({ token }) {
   }
 
   if (!me) return <main className="wrap narrow"><h1 className="display">Your sign-up</h1><p className={msg ? 'err' : 'muted'}>{msg || 'Loading…'}</p></main>
-  const [title, text] = STATUS_TEXT[me.status] || [me.status, '']
+  const [title, text] = me.path === 'sub' && me.status === 'verified' ? ['In the sub pool', 'Free entry, no payment needed. Next we check your rank on tracker.gg.'] : STATUS_TEXT[me.status] || [me.status, '']
   return (
     <main className="wrap narrow">
       <a href="/" className="mono muted">← Home</a>

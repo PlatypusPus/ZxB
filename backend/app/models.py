@@ -57,7 +57,7 @@ class Player(Base):
     discord: Mapped[str] = mapped_column(String(40))
     phone: Mapped[str] = mapped_column(String(10))
     photo: Mapped[str | None] = mapped_column(String(40))
-    path: Mapped[str] = mapped_column(String(8))  # leader | auction
+    path: Mapped[str] = mapped_column(String(8))  # leader | auction | sub (free sub pool, never auctioned)
     # submitted, verified, approved, rejected, waitlisted, withdrawn
     status: Mapped[str] = mapped_column(String(12), default="submitted", index=True)
     reject_reason: Mapped[str] = mapped_column(Text, default="")

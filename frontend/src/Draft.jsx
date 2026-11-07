@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from './api.js'
 import { PlayerCard, TeamCard } from './Cards.jsx'
 import { Stamp, TimerTiles } from './Projector.jsx'
-import { Count, Footer, Nav, SlotMeter, Ticker } from './Layout.jsx'
+import { Count, Footer, Nav, Schedule, SlotMeter, Ticker } from './Layout.jsx'
 
 const FAQ = [
   ['Who can sign up?', 'Anyone who plays Valorant. Pay the ₹300 entry, pick team leader or auction player, and wait for verification.'],
@@ -81,7 +81,7 @@ export default function Draft() {
         <section className="hero hero-split wrap">
           <div className="hero-copy">
             <h1 className="display hero-title"><span data-decode>Valorant</span><span className="outline" data-decode>Auction</span></h1>
-            <p className="lede">Lead a team or get drafted. Eight leaders spend {info?.credits_per_team ?? 1000} credits each in a live auction on {info?.event_date || 'a date to be announced'}.</p>
+            <p className="lede">Lead a team or get drafted. {info?.teams ?? 10} leaders spend {info?.credits_per_team ?? 1000} credits each in a live auction on {info?.event_date || 'a date to be announced'}.</p>
             <div className="actions">
               {open !== false ? <a className="btn big" href="/signup">Sign up · ₹{info?.fee ?? 300}</a> : <span className="tag">Registration is closed</span>}
               <a className="btn big ghost" href="/projector">Watch the auction</a>
@@ -96,7 +96,7 @@ export default function Draft() {
             <p className="mono muted">AT A GLANCE</p>
             <SlotMeter info={info} />
             <dl className="facts">
-              <div><dt className="mono muted">TEAMS</dt><dd>{info?.teams ?? 8} teams · 5 + subs</dd></div>
+              <div><dt className="mono muted">TEAMS</dt><dd>{info?.teams ?? 10} teams · 5 + subs</dd></div>
               <div><dt className="mono muted">ROSTER</dt><dd>Leader + {info?.min_players ?? 4} or more</dd></div>
               <div><dt className="mono muted">UNSOLD</dt><dd>Round 2 at half price</dd></div>
             </dl>
@@ -111,7 +111,7 @@ export default function Draft() {
             <AuctionDemo />
             <ol className="how-steps">
               <li><strong>Sign up</strong><span>Fill your profile, pick leader or player, pay ₹{info?.fee ?? 300} by UPI and enter the UTR.</span></li>
-              <li><strong>Get drafted</strong><span>{info?.teams ?? 8} leaders bid on players live with {info?.credits_per_team ?? 1000} credits each. Every bid resets the clock.</span></li>
+              <li><strong>Get drafted</strong><span>{info?.teams ?? 10} leaders bid on players live with {info?.credits_per_team ?? 1000} credits each. Every bid resets the clock.</span></li>
               <li><strong>Play</strong><span>Teams of 5 plus subs play it out. Rosters are public the moment the auction ends.</span></li>
             </ol>
           </div>
@@ -119,7 +119,7 @@ export default function Draft() {
 
         <section className="wrap split" data-section>
           <article className="card panel" data-build>
-            <p className="mono amber">PATH A · {info?.leader_slots_left ?? 8} OF {info?.teams ?? 8} SLOTS LEFT</p>
+            <p className="mono amber">PATH A · {info?.leader_slots_left ?? 10} OF {info?.teams ?? 10} SLOTS LEFT</p>
             <h2 className="display">Team leader</h2>
             <p>Create your team: name, tag and logo. You're on your own team for free and never auctioned. You build the rest of the roster with credits.</p>
           </article>
@@ -127,6 +127,11 @@ export default function Draft() {
             <p className="mono amber">PATH B</p>
             <h2 className="display">Auction player</h2>
             <p>Show your rank, role and playstyle on your card. Leaders bid for you live. Base price depends on your rank.</p>
+          </article>
+          <article className="card panel" data-build>
+            <p className="mono amber">PATH C · FREE</p>
+            <h2 className="display">Sub pool</h2>
+            <p>Not auctioned, no fee. You're called in when a team is a player short. If that team wins the tournament, you get the missing teammate's share of the prize for the matches you played.</p>
           </article>
         </section>
 
@@ -137,6 +142,11 @@ export default function Draft() {
             <article className="card" data-build><h3>Rosters</h3><p>Leader plus at least {info?.min_players ?? 4} bought players. A leader can never bid what would leave them short.</p></article>
             <article className="card" data-build><h3>Base prices</h3><p className="small">{info ? Object.entries(info.band_base_price).sort((a, b) => a[1] - b[1]).map(([k, v]) => `${k} ${v}`).join(' · ') : '…'}</p></article>
           </div>
+        </section>
+
+        <section className="wrap" data-section>
+          <h2 className="display" data-decode>Schedule</h2>
+          <Schedule />
         </section>
 
         <section className="wrap teams" data-section data-pin>

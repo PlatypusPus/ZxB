@@ -17,8 +17,8 @@ VALORANT = {
     "tracker_url": "https://tracker.gg/valorant/profile/riot/{riot_id}/overview",
 }
 DEFAULT_SETTINGS = {
-    "fee": 300, "teams": 8, "credits_per_team": 1000, "min_players": 4,
-    "event_date": "", "upi_id": "", "upi_name": "ZenithXBeans",
+    "fee": 300, "teams": 10, "credits_per_team": 1000, "min_players": 4,
+    "event_date": "11 Nov 2026", "upi_id": "", "upi_name": "ZenithXBeans",
     "registration_opens_at": None, "registration_closes_at": None, "terms_version": "v1",
     # auction (locked once it starts)
     "max_players": None,            # set after registration closes; must fit every approved player

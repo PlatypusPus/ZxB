@@ -86,16 +86,17 @@ async def signup(
              role=role, playstyle=playstyle, quote=quote, discord=discord, phone=phone,
              team_name=team_name, team_tag=team_tag)
     errors = validate_profile(d, cfg)
-    if path not in ("leader", "auction"):
-        errors["path"] = "Choose team leader or auction player"
+    if path not in ("leader", "auction", "sub"):
+        errors["path"] = "Choose team leader, auction player or sub"
+    free = path == "sub"  # the sub pool is free: no UTR, no screenshot
     if path == "leader":
         errors |= validate_team(d)
         if not logo or not logo.filename:
             errors["logo"] = "Upload your team logo"
     utr = re.sub(r"\s", "", utr)
-    if not re.fullmatch(r"\d{12}", utr):
+    if not free and not re.fullmatch(r"\d{12}", utr):
         errors["utr"] = "The UTR is the 12-digit number in your UPI app's payment details"
-    if not screenshot or not screenshot.filename:
+    if not free and (not screenshot or not screenshot.filename):
         errors["screenshot"] = "Upload the payment screenshot"
     if not terms:
         errors["terms"] = "You need to accept the rules, refund policy and privacy notice"
@@ -103,9 +104,11 @@ async def signup(
         raise HTTPException(422, {"errors": errors})
 
     # Validate every image in memory first, so a bad upload writes nothing to disk.
-    files: list[tuple] = [(PRIVATE_DIR / image_name(), process_image(await screenshot.read(2**21 + 1), "screenshot", False))]
+    files: list[tuple] = [] if free else [(PRIVATE_DIR / image_name(), process_image(await screenshot.read(2**21 + 1), "screenshot", False))]
+    photo_file = None
     if photo and photo.filename:
-        files.append((PUBLIC_DIR / image_name(), process_image(await photo.read(2**21 + 1), "photo", True)))
+        photo_file = (PUBLIC_DIR / image_name(), process_image(await photo.read(2**21 + 1), "photo", True))
+        files.append(photo_file)
     if path == "leader":
         files.append((PUBLIC_DIR / image_name(), process_image(await logo.read(2**21 + 1), "logo", True)))
 
@@ -114,13 +117,16 @@ async def signup(
     p = Player(display_name=d["display_name"], riot_id=d["riot_id"], riot_id_key=d["riot_id"].lower(),
                current_rank_tier=current_rank, peak_rank_tier=peak_rank, role=role, playstyle=d["playstyle"],
                quote=d["quote"], discord=d["discord"], phone=d["phone"], path=path,
-               photo=files[1][0].name if photo and photo.filename else None,
-               status="waitlisted" if waitlist else "submitted", edit_token_hash=token_hash,
+               photo=photo_file and photo_file[0].name,
+               status="waitlisted" if waitlist else "verified" if free else "submitted", edit_token_hash=token_hash,
                terms_version=TERMS_VERSION, terms_accepted_at=utcnow())
     db.add(p)
     try:
         await db.flush()
-        db.add(Payment(player_id=p.id, amount=t.settings["fee"], utr=utr, screenshot=files[0][0].name))
+        # Subs get a ₹0 payment row that is already verified, so the approval flow (rank check) is unchanged.
+        db.add(Payment(player_id=p.id, amount=t.settings["fee"], utr=utr, screenshot=files[0][0].name) if not free else
+               Payment(player_id=p.id, amount=0, utr=f"FREE{p.id}", screenshot="", status="verified",
+                       verified_by="free sub pool", verified_at=utcnow()))
         if path == "leader":
             db.add(Team(leader_player_id=p.id, name=d["team_name"], name_key=d["team_name"].lower(),
                         tag=d["team_tag"], logo=files[-1][0].name))
@@ -160,11 +166,15 @@ def own_view(p: Player, pay: Payment, team: Team | None, cfg: dict, editable: bo
                               "profile_status": team.profile_status}}
 
 
+def editable(p: Player, pay: Payment) -> bool:
+    return pay.status == "submitted" or (p.path == "sub" and p.status == "verified")
+
+
 @router.get("/signup/{token}")
 async def my_signup(token: str, db: AsyncSession = Depends(get_db)):
     t, cfg = await load(db)
     p, pay, team = await by_token(db, token)
-    return own_view(p, pay, team, cfg, registration_open(t) and pay.status == "submitted")
+    return own_view(p, pay, team, cfg, registration_open(t) and editable(p, pay))
 
 
 @router.patch("/signup/{token}")
@@ -174,7 +184,7 @@ async def edit_signup(token: str, body: dict, request: Request, db: AsyncSession
     p, pay, team = await by_token(db, token)
     if not registration_open(t):
         raise HTTPException(403, "Registration is closed, so sign-ups can't be edited")
-    if pay.status != "submitted":
+    if not editable(p, pay):
         raise HTTPException(409, "Your sign-up is already being checked, so it can't be edited. Message the organisers.")
     fields = ("display_name", "riot_id", "playstyle", "quote", "discord", "phone", "role", "current_rank", "peak_rank")
     d = {"display_name": p.display_name, "riot_id": p.riot_id, "playstyle": p.playstyle, "quote": p.quote,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from './api.js'
-import { Footer, Nav, SlotMeter, Ticker } from './Layout.jsx'
+import { Footer, Nav, Schedule, SlotMeter, Ticker } from './Layout.jsx'
 
 const FAQ = [
   ['What is ZenithXBeans?', 'A community that runs tournaments for players, by players. Every event is community-funded and every rupee is accounted for in a public ledger.'],
@@ -81,16 +81,28 @@ export default function Home() {
                 <RankLadder bands={info?.band_base_price} />
                 {open !== false && <a className="btn" href="/signup?path=auction">Sign up as a player</a>}
               </section>
+              <section className="path sub">
+                <div>
+                  <h4 className="display">Sub pool <span className="tag">FREE</span></h4>
+                  <p>Not auctioned, no entry fee. When a team is a player short, organisers call a sub in from this pool. If that team wins the tournament, you get the missing teammate's share of the prize for the matches you played.</p>
+                </div>
+                {open !== false && <a className="btn ghost" href="/signup?path=sub">Join the sub pool</a>}
+              </section>
             </div>
 
             <dl className="auction-facts">
               <div><dt className="mono muted">ENTRY</dt><dd>₹{info?.fee ?? 300}</dd></div>
-              <div><dt className="mono muted">TEAMS</dt><dd>{info?.teams ?? 8}</dd></div>
-              <div><dt className="mono muted">CREDITS EACH</dt><dd>{info?.credits_per_team ?? 1000}</dd></div>
-              <div><dt className="mono muted">UNSOLD</dt><dd>Round 2, half price</dd></div>
+              <div><dt className="mono muted">SUBS</dt><dd>Free</dd></div>
+              <div><dt className="mono muted">TEAMS</dt><dd>{info?.teams ?? 10}</dd></div>
+              <div><dt className="mono muted">GRAND FINAL</dt><dd>22 Nov</dd></div>
             </dl>
             <a className="auction-more" href="/draft">Full format and rules →</a>
           </article>
+        </section>
+
+        <section className="wrap" id="schedule" data-section>
+          <h2 className="display" data-decode>Schedule</h2>
+          <Schedule />
         </section>
 
         <section className="wrap" data-section>
@@ -111,7 +123,7 @@ export default function Home() {
                 <EventDate date={info?.event_date} />
                 <span className="event-main">
                   <span className="event-title display">{name}</span>
-                  <span className="event-meta mono muted">VALORANT · PLAYER AUCTION · {info?.teams ?? 8} TEAMS · ₹{info?.fee ?? 300} ENTRY</span>
+                  <span className="event-meta mono muted">VALORANT · PLAYER AUCTION · {info?.teams ?? 10} TEAMS · ₹{info?.fee ?? 300} ENTRY</span>
                 </span>
                 <span className="event-status">
                   <span className={'tag' + (open === false ? ' ghost' : '')}>{open === false ? 'SIGN-UPS CLOSED' : 'SIGN-UPS OPEN'}</span>

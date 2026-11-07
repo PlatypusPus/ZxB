@@ -130,7 +130,7 @@ export function Footer() {
     <footer className="wrap footer" data-section>
       <div className="grid3">
         <div><a href="/" className="brand" aria-label="ZenithXBeans home"><Logo /></a><p className="muted">Community Valorant tournaments.</p></div>
-        <div><p><strong>Policies</strong></p><div className="actions"><a className="btn ghost" href="/refund-policy">Refund policy</a><a className="btn ghost" href="/privacy">Privacy</a></div></div>
+        <div><p><strong>Policies</strong></p><div className="actions"><a className="btn ghost" href="/terms">Terms</a><a className="btn ghost" href="/refund-policy">Refund policy</a><a className="btn ghost" href="/privacy">Privacy</a></div></div>
         <div><p><strong>Contact on Discord</strong></p><Contacts /></div>
       </div>
       <p className="muted small">{RIOT_NOTICE}</p>

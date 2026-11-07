@@ -225,7 +225,7 @@ export default function Signup() {
           <div className="field">
             <label className="check">
               <input id="f-terms" type="checkbox" checked={v.terms} onChange={e => set('terms', e.target.checked)} aria-describedby={errors.terms ? 'terms-e' : undefined} />
-              <span>I accept the rules, the <a href="/refund-policy" target="_blank">refund policy</a> (no refunds, swaps allowed) and the <a href="/privacy" target="_blank">privacy notice</a>, and agree to my rank being checked on tracker.gg.</span>
+              <span>I accept the <a href="/terms" target="_blank">terms of service</a>, the <a href="/refund-policy" target="_blank">refund policy</a> (no refunds, swaps allowed) and the <a href="/privacy" target="_blank">privacy notice</a>, and agree to my rank being checked on tracker.gg.</span>
             </label>
             {errors.terms && <p className="err" id="terms-e">{errors.terms}</p>}
           </div>
@@ -288,7 +288,7 @@ function SignIn({ providers, error, info, path, onDone }) {
         {input('password', 'Password', { type: 'password', autoComplete: mode === 'login' ? 'current-password' : 'new-password', minLength: 8, maxLength: 128, hint: mode === 'register' ? 'At least 8 characters' : undefined })}
         <button className="btn" disabled={busy}>{busy ? 'One moment…' : mode === 'login' ? 'Log in' : 'Create account'}</button>
       </form>
-      <p className="muted small">We keep your name and email, and never see your Google password. See the <a href="/privacy">privacy notice</a>.</p>
+      <p className="muted small">We keep your name and email, and never see your Google password. By continuing you agree to the <a href="/terms">terms of service</a> and <a href="/privacy">privacy notice</a>.</p>
     </main>
   )
 }

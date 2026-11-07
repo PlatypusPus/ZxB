@@ -27,6 +27,52 @@ function Refund({ fee }) {
   </>
 }
 
+function Terms({ fee }) {
+  return <>
+    <h1 className="display">Terms of service</h1>
+    <p className="lede">These terms cover using zxb.shov.in and taking part in tournaments run by ZenithXBeans. By making an account or signing up, you agree to them.</p>
+
+    <h2>Who runs this</h2>
+    <p>ZenithXBeans is a community group that runs Valorant tournaments, contactable through shanks_87 or mystic_mc on Discord. Our tournaments aren't affiliated with or endorsed by Riot Games.</p>
+
+    <h2>Your account</h2>
+    <ul>
+      <li>You can sign in with Google or make an account with your email and a password. Email accounts must be verified before you can register.</li>
+      <li>One person, one account, one sign-up per event. Keep your password, your edit link and any captain link private: anyone who has them can act as you.</li>
+      <li>Give accurate details. Your name, Riot ID and rank are checked, and false details can get your sign-up rejected.</li>
+    </ul>
+
+    <h2>Signing up and paying</h2>
+    <ul>
+      <li>Auction players and captains pay a ₹{fee} entry fee by UPI. The sub pool is free.</li>
+      <li>Organisers verify every payment and rank before approving a sign-up, and decide who becomes a captain. Captain places are limited.</li>
+      <li>Fees aren't refunded, but you can swap your place with another player. See the <a href="/refund-policy">refund policy</a>.</li>
+    </ul>
+
+    <h2>The auction and matches</h2>
+    <ul>
+      <li>Captains bid for players live, in the room, with the credits they're given. The organisers record every bid; their record is final.</li>
+      <li>Schedules, formats and rules are announced on the site and our Instagram accounts, and can change if needed. We'll tell participants by email when they do.</li>
+      <li>Play fair. Cheating, account sharing, smurfing, abuse or harassment of other players can get you removed from the event without a refund.</li>
+    </ul>
+
+    <h2>Prizes</h2>
+    <p>Any prizes are announced before the event and paid to the winning team as announced. A sub who plays for a winning team receives the prize share of the teammate they replaced, for the matches they played. Organisers settle any disputes about prizes.</p>
+
+    <h2>Your content</h2>
+    <p>You let us show your display name, Riot ID, rank, role, playstyle, quote, photo, and your team's name, tag and logo on the site, the auction screen and our social media for the event. Don't upload anything you don't have the right to use or that's offensive; we may remove it.</p>
+
+    <h2>Emails</h2>
+    <p>We email you about your account, your sign-up result and the event, including announcements from the organisers. We don't sell your details. See the <a href="/privacy">privacy notice</a>.</p>
+
+    <h2>Limits</h2>
+    <p>The site and events are run by volunteers and provided as they are. We aren't responsible for problems caused by Riot Games' servers, your internet, your UPI app or things outside our control. Nothing here limits rights you have under Indian law.</p>
+
+    <h2>Changes</h2>
+    <p>We may update these terms. The date below shows the latest version. Big changes are emailed to participants.</p>
+  </>
+}
+
 function Privacy() {
   return <>
     <h1 className="display">Privacy</h1>
@@ -70,11 +116,13 @@ export default function Policy({ kind }) {
     <>
       <Nav info={info} />
       <main className="wrap narrow policy">
-        {kind === 'refund' ? <Refund fee={info?.fee ?? 300} /> : <Privacy />}
+        {kind === 'refund' ? <Refund fee={info?.fee ?? 300} /> : kind === 'terms' ? <Terms fee={info?.fee ?? 300} /> : <Privacy />}
         <p className="muted small">Last updated {UPDATED}.</p>
         <div className="actions">
           <a className="btn" href="/signup">Sign up</a>
-          <a className="btn ghost" href={kind === 'refund' ? '/privacy' : '/refund-policy'}>{kind === 'refund' ? 'Privacy' : 'Refund policy'}</a>
+          {kind !== 'terms' && <a className="btn ghost" href="/terms">Terms of service</a>}
+          {kind !== 'refund' && <a className="btn ghost" href="/refund-policy">Refund policy</a>}
+          {kind !== 'privacy' && <a className="btn ghost" href="/privacy">Privacy</a>}
         </div>
       </main>
       <Footer />

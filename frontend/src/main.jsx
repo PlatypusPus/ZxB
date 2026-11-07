@@ -19,6 +19,7 @@ const page = path === '/draft' || path === '/auction' ? <Draft />
   : path === '/projector' ? <Projector />
   : path === '/refund-policy' ? <Policy kind="refund" />
   : path === '/privacy' ? <Policy kind="privacy" />
+  : path === '/terms' ? <Policy kind="terms" />
   : path.startsWith('/leader/') ? <Leader code={decodeURIComponent(path.slice(8))} />
   : path === '/verified' ? <Verified />
   : path === '/' ? <Home />
@@ -32,6 +33,7 @@ const META = {
   '/signup': ['Sign up · ZenithXBeans Valorant Auction', 'Register for the ZenithXBeans Valorant Auction as a captain, auction player or sub.'],
   '/refund-policy': ['Refund policy · ZenithXBeans', 'Entry fees are not refunded, but you can swap your place with another player.'],
   '/privacy': ['Privacy · ZenithXBeans', 'What ZenithXBeans collects when you register, and who can see it.'],
+  '/terms': ['Terms of service · ZenithXBeans', 'The terms for using zxb.shov.in and taking part in ZenithXBeans tournaments.'],
   '/verified': ['Email verified · ZenithXBeans', 'Your email is verified.'],
 }
 const canon = path === '/auction' ? '/draft' : path

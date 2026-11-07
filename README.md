@@ -1,4 +1,4 @@
-# ZenithXBeans Valorant Draft
+# ZenithXBeans Valorant Auction
 
 Community tournament site + the first event, a live Valorant player auction.
 

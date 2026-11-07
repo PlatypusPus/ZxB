@@ -71,7 +71,7 @@ export default function Draft() {
     api('/teams').then(setTeams).catch(() => {})
     api('/players').then(setPool).catch(() => {})
   }, [])
-  const name = info?.name || 'ZenithXBeans Valorant Draft'
+  const name = info?.name || 'ZenithXBeans Valorant Auction'
   const open = info?.registration_open
 
   return (
@@ -80,7 +80,7 @@ export default function Draft() {
       <main>
         <section className="hero hero-split wrap">
           <div className="hero-copy">
-            <h1 className="display hero-title"><span data-decode>Valorant</span><span className="outline" data-decode>Draft</span></h1>
+            <h1 className="display hero-title"><span data-decode>Valorant</span><span className="outline" data-decode>Auction</span></h1>
             <p className="lede">Lead a team or get drafted. Eight leaders spend {info?.credits_per_team ?? 1000} credits each in a live auction on {info?.event_date || 'a date to be announced'}.</p>
             <div className="actions">
               {open !== false ? <a className="btn big" href="/signup">Sign up · ₹{info?.fee ?? 300}</a> : <span className="tag">Registration is closed</span>}

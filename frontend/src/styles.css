@@ -431,3 +431,36 @@ a.event:hover .event-go { transform: translateX(6px); }
   .event-go { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .event, .event-go { transition: none; } }
+
+/* Home: the featured auction card. Two paths side by side, the rank ladder under the player path. */
+.auction-card { display: grid; gap: calc(var(--t) * 1.5); padding: calc(var(--t) * 2); border-color: #3a3a44; }
+.auction-head { display: grid; gap: 12px; }
+.auction-head .tags { margin: 0; }
+.auction-head h3.display { font-size: clamp(40px, 6vw, 88px); margin: 0; }
+.auction-sub { font-size: clamp(17px, 1.6vw, 20px); margin: 0; max-width: 56ch; }
+.auction-paths { display: grid; grid-template-columns: 1fr 1fr; gap: var(--t); }
+.path { display: flex; flex-direction: column; gap: var(--t); padding: calc(var(--t) * 1.25); background: var(--base); border: 1px solid var(--line); }
+.path h4 { font-size: 32px; margin: 0; }
+.path p { margin: 0; }
+.path .btn { align-self: flex-start; margin-top: auto; }
+.ladder { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ladder li { display: grid; grid-template-columns: 9ch 1fr 4ch; gap: 12px; align-items: center; }
+.ladder-rank { font: 650 13px var(--body); font-variation-settings: 'wdth' 82; letter-spacing: .1em; text-transform: uppercase; }
+.ladder-bar { height: 10px; background: var(--tile); }
+.ladder-bar span { display: block; height: 100%; background: var(--pink); }
+.ladder-cr { font-size: 18px; color: var(--ink); text-align: right; }
+.auction-facts { display: grid; grid-template-columns: repeat(4, 1fr); margin: 0; border-top: 1px solid var(--line); padding-top: var(--t); gap: var(--t); }
+.auction-facts dd { margin: 4px 0 0; font: 400 28px var(--display); text-transform: uppercase; }
+.auction-more { justify-self: start; font-weight: 600; text-underline-offset: 4px; }
+.events-note { display: inline-block; margin: 12px 0 0; padding: 8px 12px; background: var(--base); }
+#tournaments { padding-bottom: var(--t); }
+@media (max-width: 900px) {
+  .auction-card { padding: var(--t); }
+  .auction-paths { grid-template-columns: 1fr; }
+  .auction-facts { grid-template-columns: 1fr 1fr; }
+}
+.path-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.path-list li { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.path-list span { font: 650 13px var(--body); font-variation-settings: 'wdth' 82; letter-spacing: .1em; text-transform: uppercase; }
+.path-list b { font-weight: 600; }
+.path-list .digits { font-size: 18px; color: var(--ink); }

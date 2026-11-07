@@ -47,7 +47,7 @@ async def init_db() -> None:
             cfg = GameConfig(game="valorant", data=VALORANT)
             db.add(cfg)
             await db.flush()
-            db.add(Tournament(id=1, game_config_id=cfg.id, name="ZenithXBeans Valorant Draft",
+            db.add(Tournament(id=1, game_config_id=cfg.id, name="ZenithXBeans Valorant Auction",
                               settings=DEFAULT_SETTINGS))
             await db.commit()
 

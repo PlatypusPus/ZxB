@@ -16,11 +16,28 @@ function EventDate({ date }) {
   return <span className="event-when"><b className="digits">{ok ? d : 'TBA'}</b><span className="mono">{ok ? m?.toUpperCase() : 'DATE'}</span></span>
 }
 
+// Rank groups and their starting credits, highest first. The organiser sets the numbers in Admin -> Settings.
+function RankLadder({ bands }) {
+  const rows = Object.entries(bands || {}).sort((a, b) => b[1] - a[1])
+  const top = rows[0]?.[1] || 1
+  return (
+    <ol className="ladder" aria-label="Starting price by rank group">
+      {rows.map(([rank, cr]) => (
+        <li key={rank}>
+          <span className="ladder-rank">{rank}</span>
+          <span className="ladder-bar" aria-hidden="true"><span style={{ width: `${(cr / top) * 100}%` }} /></span>
+          <span className="ladder-cr digits">{cr}</span>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
 export default function Home() {
   const [info, setInfo] = useState(null)
   useEffect(() => { api('/public').then(setInfo).catch(() => {}) }, [])
   const open = info?.registration_open
-  const name = info?.name || 'ZenithXBeans Valorant Draft'
+  const name = info?.name || 'ZenithXBeans Valorant Auction'
 
   return (
     <>
@@ -38,24 +55,41 @@ export default function Home() {
 
         <section className="wrap" id="featured" data-section>
           <h2 className="display" data-decode>Featured tournament</h2>
-          <p className="lede featured-lede">Community tournaments with verified entries, fair formats and a public ledger. First up: a live player auction.</p>
-          <article className="card featured" data-build>
-            <div>
-              <p className="tags"><span className="tag">{open === false ? 'SIGN-UPS CLOSED' : 'SIGN-UPS OPEN'}</span><span className="tag ghost">VALORANT</span></p>
-              <h2 className="display">{name}</h2>
-              <p>Eight leaders build their teams in a live auction with a fixed credit budget. Everyone who pays and is approved gets a team.</p>
-              <SlotMeter info={info} />
-              <div className="actions">
-                <a className="btn" href="/draft">See the format</a>
-                {open !== false && <a className="btn ghost" href="/signup">Sign up · ₹{info?.fee ?? 300}</a>}
-              </div>
+          <article className="card auction-card" data-build>
+            <header className="auction-head">
+              <p className="tags"><span className={'tag' + (open === false ? ' ghost' : '')}>{open === false ? 'SIGN-UPS CLOSED' : 'SIGN-UPS OPEN'}</span><span className="tag ghost">VALORANT</span><span className="tag ghost">{info?.event_date || 'DATE TBA'}</span></p>
+              <h3 className="display">{name}</h3>
+              <p className="auction-sub">Team leaders build their rosters by buying players in a live auction. Everyone who signs up and is approved gets a team.</p>
+            </header>
+
+            <div className="auction-paths">
+              <section className="path">
+                <h4 className="display">Team leaders</h4>
+                <p>Name your team, pick a tag and logo. You get <strong className="amber">{info?.credits_per_team ?? 1000} credits</strong> to buy at least {info?.min_players ?? 4} players. You're never auctioned.</p>
+                <ul className="path-list">
+                  <li><span>Budget</span><b className="digits">{info?.credits_per_team ?? 1000}</b></li>
+                  <li><span>Players to buy</span><b className="digits">{info?.min_players ?? 4}+</b></li>
+                  <li><span>Bid from</span><b>Your phone, live</b></li>
+                  <li><span>Unspent credits</span><b>Lost at the end</b></li>
+                </ul>
+                <SlotMeter info={info} />
+                {open !== false && <a className="btn" href="/signup?path=leader">Sign up as a leader</a>}
+              </section>
+              <section className="path">
+                <h4 className="display">Players</h4>
+                <p>Make your player card and go under the hammer. Your <strong className="amber">starting price depends on your rank group</strong>, and leaders bid up from there.</p>
+                <RankLadder bands={info?.band_base_price} />
+                {open !== false && <a className="btn" href="/signup?path=auction">Sign up as a player</a>}
+              </section>
             </div>
-            <dl className="facts">
-              <div><dt className="mono muted">FORMAT</dt><dd>Player auction</dd></div>
-              <div><dt className="mono muted">TEAMS</dt><dd>{info?.teams ?? 8} teams · 5 + subs</dd></div>
+
+            <dl className="auction-facts">
               <div><dt className="mono muted">ENTRY</dt><dd>₹{info?.fee ?? 300}</dd></div>
-              <div><dt className="mono muted">DATE</dt><dd>{info?.event_date || 'TBA'}</dd></div>
+              <div><dt className="mono muted">TEAMS</dt><dd>{info?.teams ?? 8}</dd></div>
+              <div><dt className="mono muted">CREDITS EACH</dt><dd>{info?.credits_per_team ?? 1000}</dd></div>
+              <div><dt className="mono muted">UNSOLD</dt><dd>Round 2, half price</dd></div>
             </dl>
+            <a className="auction-more" href="/draft">Full format and rules →</a>
           </article>
         </section>
 
@@ -66,17 +100,6 @@ export default function Home() {
               ['02', 'Get verified', 'Organisers check your payment against the bank statement and your rank on tracker.gg.'],
               ['03', 'Play', 'Get your team, play the bracket, and see the results posted publicly.']]
               .map(([n, h, p]) => <article className="card" data-build key={n}><p className="mono amber">{n}</p><h3>{h}</h3><p>{p}</p></article>)}
-          </div>
-        </section>
-
-        <section className="wrap" data-section>
-          <h2 className="display" data-decode>Run in the open</h2>
-          <div className="grid4">
-            {[['Verified entries', 'Every UTR is checked against the statement. Duplicate UTRs are refused automatically.'],
-              ['Public ledger', 'Where the money came from and where it went, exported and shared after each event.'],
-              ['Audit log', 'Every payment decision, bid, sale and undo is recorded with its exact order.'],
-              ['Fair formats', 'Rules are enforced by the software, not by whoever shouts loudest.']]
-              .map(([h, p]) => <article className="card" data-build key={h}><h3>{h}</h3><p className="muted">{p}</p></article>)}
           </div>
         </section>
 
@@ -97,16 +120,8 @@ export default function Home() {
                 <svg className="event-go" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15M13 6l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="square" /></svg>
               </a>
             </li>
-            <li data-build>
-              <div className="event soon">
-                <span className="event-when"><b className="digits">?</b><span className="mono">SOON</span></span>
-                <span className="event-main">
-                  <span className="event-title display">Next tournament</span>
-                  <span className="event-meta mono muted">ANNOUNCED ON THE ZENITHXBEANS DISCORD FIRST</span>
-                </span>
-              </div>
-            </li>
           </ol>
+          <p className="events-note muted">More tournaments are announced on the ZenithXBeans Discord first, then listed here.</p>
         </section>
 
         <section className="wrap" data-section>

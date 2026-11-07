@@ -60,7 +60,7 @@ const focusFirst = e => requestAnimationFrame(() => {
 
 export default function Signup() {
   const [info, setInfo] = useState(null)
-  const [v, setV] = useState({ ...EMPTY, ...saved.v })
+  const [v, setV] = useState({ ...EMPTY, path: new URLSearchParams(location.search).get('path') === 'leader' ? 'leader' : 'auction', ...saved.v })
   const [files, setFiles] = useState({})
   const [errors, setErrors] = useState({})
   const [step, setStep] = useState(saved.step || 0)

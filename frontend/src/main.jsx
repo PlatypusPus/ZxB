@@ -10,7 +10,7 @@ import Leader from './Leader.jsx'
 
 // ponytail: seven routes, so a pathname switch instead of a router library.
 const path = location.pathname.replace(/\/+$/, '') || '/'
-const page = path === '/draft' ? <Draft />
+const page = path === '/draft' || path === '/auction' ? <Draft />
   : path.startsWith('/signup') ? <Signup />
   : path.startsWith('/status/') ? <Status token={decodeURIComponent(path.slice(8))} />
   : path.startsWith('/admin') ? <Admin />
@@ -20,7 +20,7 @@ const page = path === '/draft' ? <Draft />
 
 createRoot(document.getElementById('root')).render(page)
 
-const showcase = path === '/' || path === '/draft'
+const showcase = path === '/' || path === '/draft' || path === '/auction'
 const still = matchMedia('(prefers-reduced-motion: reduce)').matches
 
 // Static tier band (CSS): climbs with scroll. The WebGL matrix replaces it when it boots.

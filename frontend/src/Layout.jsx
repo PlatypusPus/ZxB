@@ -12,7 +12,7 @@ export function Logo() {
   )
 }
 
-const LINKS = [['/', 'Home'], ['/#tournaments', 'Tournaments'], ['/draft', 'Valorant Draft'], ['/projector', 'Live auction']]
+const LINKS = [['/', 'Home'], ['/#tournaments', 'Tournaments'], ['/draft', 'Valorant Auction'], ['/projector', 'Live auction']]
 
 export function Nav({ info }) {
   const [open, setOpen] = useState(false)

@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0b0b0d" />
     <title>ZenithXBeans · Community Tournaments</title>
-    <meta name="description" content="Community tournaments hosted by ZenithXBeans. First up: the Valorant Draft, a live player auction. ₹300 entry." />
+    <meta name="description" content="Community tournaments hosted by ZenithXBeans. First up: the Valorant Auction, a live player auction. ₹300 entry." />
     <meta property="og:title" content="ZenithXBeans · Community Tournaments" />
-    <meta property="og:description" content="First up: the Valorant Draft. Lead a team or get drafted in a live auction. ₹300 entry." />
+    <meta property="og:description" content="First up: the Valorant Auction. Lead a team or get drafted in a live auction. ₹300 entry." />
     <meta property="og:image" content="/og.png" />
     <meta property="og:type" content="website" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -17,7 +17,7 @@
       // Hide cards before first paint only when the matrix will build them; give up after 3 s.
       (function () {
         var p = location.pathname.replace(/\/+$/, '') || '/'
-        if ((p === '/' || p === '/draft') && !matchMedia('(prefers-reduced-motion: reduce)').matches && window.WebGL2RenderingContext) {
+        if ((p === '/' || p === '/draft' || p === '/auction') && !matchMedia('(prefers-reduced-motion: reduce)').matches && window.WebGL2RenderingContext) {
           var r = document.documentElement
           r.classList.add('fx')
           setTimeout(function () { if (!r.classList.contains('gl')) r.classList.remove('fx') }, 3000)

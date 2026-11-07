@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { api } from './api.js'
 import { useAuction, useCountdown } from './live.js'
 
-const TABS = ['Queue', 'Teams', 'Live', 'Settings', 'Ledger', 'Audit']
+const TABS = ['Queue', 'Teams', 'Live', 'Settings', 'Payments', 'Audit']
+const PATH = { leader: 'Captain', auction: 'Auction player', sub: 'Sub (free)' }
 
 export default function Admin() {
   const [token, setToken] = useState(sessionStorage.getItem('zxb-admin'))
@@ -21,7 +22,7 @@ export default function Admin() {
       {tab === 'Teams' && <Teams call={call} />}
       {tab === 'Live' && <Live call={call} token={token} />}
       {tab === 'Settings' && <Settings call={call} />}
-      {tab === 'Ledger' && <Ledger token={token} />}
+      {tab === 'Payments' && <Payments token={token} />}
       {tab === 'Audit' && <Audit call={call} />}
     </main>
   )
@@ -61,6 +62,8 @@ function Shot({ name, token }) {
 function Queue({ call, token }) {
   const [rows, setRows] = useState([])
   const [filter, setFilter] = useState('')
+  const [pathF, setPathF] = useState('')
+  const shown = rows.filter(r => !pathF || r.path === pathF)
   const [note, setNote] = useState({})
   const [flash, setFlash] = useState('')
   const load = () => call(`/admin/queue${filter ? `?status=${filter}` : ''}`).then(setRows).catch(e => setFlash(e.message))
@@ -70,7 +73,7 @@ function Queue({ call, token }) {
     try {
       const r = await call(path, { method: 'POST', body: body || {} })
       setFlash(r.leader_code
-        ? `${row.display_name} approved. Leader link, send it on WhatsApp now (shown once): ${location.origin}/leader/${r.leader_code}`
+        ? `${row.display_name} approved as captain. Send them this captain link on WhatsApp now (shown once). It lets them edit their team profile: ${location.origin}/leader/${r.leader_code}`
         : `${row.display_name}: ${r.status || r.payment_status}`)
       load()
     } catch (e) { setFlash(`${row.display_name}: ${e.message}`) }
@@ -84,20 +87,23 @@ function Queue({ call, token }) {
         <label>Status <select value={filter} onChange={e => setFilter(e.target.value)}>
           {['', 'submitted', 'verified', 'approved', 'waitlisted', 'rejected', 'withdrawn'].map(s => <option key={s} value={s}>{s || 'all'}</option>)}
         </select></label>
-        <span className="muted">{rows.length} sign-ups</span>
+        <label>Path <select value={pathF} onChange={e => setPathF(e.target.value)}>
+          {['', 'leader', 'auction', 'sub'].map(p => <option key={p} value={p}>{PATH[p] || 'all'}</option>)}
+        </select></label>
+        <span className="muted">{shown.length} sign-ups</span>
       </div>
       {flash && <p className="flash" role="status">{flash}</p>}
       <div className="table-wrap">
         <table>
           <thead><tr><th>Player</th><th>Rank</th><th>Path</th><th>Payment</th><th>Screenshot</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody>
-            {rows.map(r => {
+            {shown.map(r => {
               const pay = r.payment
               return (
                 <tr key={r.id}>
                   <td><strong>{r.display_name}</strong><br /><a href={r.tracker_url} target="_blank" rel="noreferrer" className="mono">{r.riot_id} ↗</a><br /><span className="muted small">{r.phone} · {r.discord}</span></td>
                   <td>{r.current_rank}<br /><span className="muted">peak {r.peak_rank}</span><br />{r.role}</td>
-                  <td>{r.path}{r.team && <><br /><span className="muted">{r.team.name} [{r.team.tag}]</span></>}</td>
+                  <td>{PATH[r.path] || r.path}{r.team && <><br /><span className="muted">{r.team.name} [{r.team.tag}]</span></>}</td>
                   <td className="mono">{pay.utr}<br />₹{pay.amount} · {pay.status}</td>
                   <td>{pay.screenshot ? <Shot name={pay.screenshot} token={token} /> : <span className="muted">Free sub</span>}</td>
                   <td>{r.status}{r.reject_reason && <><br /><span className="muted small">{r.reject_reason}</span></>}</td>
@@ -144,10 +150,10 @@ function Teams({ call }) {
           <article className="card" key={r.id}>
             <img className="logo" src={r.team.logo_url} alt={`${r.team.name} logo`} />
             <h3>{r.team.name} <span className="mono amber">[{r.team.tag}]</span></h3>
-            <p className="muted">Leader {r.display_name} · {r.status}</p>
+            <p className="muted">Captain {r.display_name} · {r.status}</p>
             <p>Profile: {r.team.profile_status}</p>
             {r.team.profile_status !== 'approved' && <button className="btn" onClick={() => post(`/admin/teams/${r.team.id}/approve-profile`, () => `${r.team.name} approved`)}>Approve name and logo</button>}
-            {r.status === 'approved' && <button className="btn ghost" onClick={() => post(`/admin/teams/${r.team.id}/new-code`, x => `New leader link for ${r.team.name} (old one revoked): ${location.origin}/leader/${x.leader_code}`)}>New leader link</button>}
+            {r.status === 'approved' && <button className="btn ghost" onClick={() => post(`/admin/teams/${r.team.id}/new-code`, x => `New captain link for ${r.team.name} (old one revoked): ${location.origin}/leader/${x.leader_code}`)}>New captain link</button>}
           </article>
         ))}
       </div>
@@ -219,7 +225,7 @@ function Settings({ call }) {
             {opts.map(o => <option key={o}>{o}</option>)}</select></div>)}
         <div className="field"><label htmlFor="s-caps">Role caps per team</label>
           <input id="s-caps" value={caps} placeholder="Duelist:2, Sentinel:2" onChange={e => setCaps(e.target.value)} />
-          <p className="hint">Leader included. Leave empty for no caps.</p></div>
+          <p className="hint">Captain included. Leave empty for no caps.</p></div>
         <div className="field"><span className="label">Base price per rank band</span>
           {bands
             ? <div className="bands">{Object.entries(bands).map(([b, v]) => <label key={b}>{b}
@@ -239,6 +245,8 @@ function Live({ call, token }) {
   const { snap, online } = useAuction()
   const [msg, setMsg] = useState('')
   const left = useCountdown(snap?.lot)
+  const [amt, setAmt] = useState('')   // the amount being called in the room; defaults to the next step
+  useEffect(() => setAmt(snap?.lot ? String(snap.lot.next_amount) : ''), [snap?.lot?.id, snap?.lot?.next_amount])
   const act = async (name, body) => {
     try { await call('/admin/auction/' + name, { method: 'POST', body: body || {} }); setMsg('') }
     catch (e) { setMsg(e.message) }
@@ -265,7 +273,7 @@ function Live({ call, token }) {
       <div className="toolbar">
         <span className="tag">{online ? st.replace('auction_', '').replaceAll('_', ' ').toUpperCase() : 'RECONNECTING'}</span>
         <span className="muted">Round {snap.round} · {snap.pool.placed}/{snap.pool.total} placed · {snap.pool.queued} queued</span>
-        <a href="/projector" target="_blank" rel="noreferrer">Open projector ↗</a>
+        <a className="btn ghost" href="/projector" target="_blank" rel="noreferrer">Open projector</a>
         <button className="btn ghost" onClick={csv}>Download results.csv</button>
       </div>
       {msg && <p className="flash" role="alert">{msg}</p>}
@@ -295,9 +303,13 @@ function Live({ call, token }) {
           </div>
         </div>
       )}
+      {lot && <div className="toolbar bid-entry">
+        <label>Bid called <input type="number" inputMode="numeric" min={lot.next_amount} step="1" value={amt} onChange={e => setAmt(e.target.value)} /></label>
+        <span className="muted">Next step is {lot.next_amount}. Type a higher number for a jump bid, then press the captain's team below. Each bid resets the timer.</span>
+      </div>}
       <div className="table-wrap">
         <table>
-          <thead><tr><th>Team</th><th>Credits left</th><th>Players</th><th>Max bid</th><th>Proxy bid</th></tr></thead>
+          <thead><tr><th>Team</th><th>Credits left</th><th>Players</th><th>Max bid</th><th>Record a called bid</th></tr></thead>
           <tbody>{snap.teams.map(t => (
             <tr key={t.id}>
               <td><strong>{t.name}</strong> <span className="mono amber">[{t.tag}]</span><br /><span className="muted small">{t.leader}</span></td>
@@ -305,8 +317,8 @@ function Live({ call, token }) {
               <td className="mono">{t.bought}/{snap.settings.max_players ?? '?'}</td>
               <td className="mono">{lot ? t.max_bid : '—'}</td>
               <td>{lot && <button className="btn ghost" disabled={!!t.blocked} title={t.blocked || ''}
-                onClick={() => act('proxy-bid', { team_id: t.id, lot_id: lot.id, amount: lot.next_amount })}>
-                {t.blocked || `Bid ${lot.next_amount}`}</button>}</td>
+                onClick={() => act('proxy-bid', { team_id: t.id, lot_id: lot.id, amount: +amt || lot.next_amount })}>
+                {t.blocked || `${t.tag} bids ${+amt || lot.next_amount}`}</button>}</td>
             </tr>
           ))}</tbody>
         </table>
@@ -316,7 +328,7 @@ function Live({ call, token }) {
   )
 }
 
-function Ledger({ token }) {
+function Payments({ token }) {
   const download = async () => {
     const res = await fetch('/api/v1/admin/payments.csv', { headers: { Authorization: `Bearer ${token}` } })
     const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(await res.blob()), download: 'payments.csv' })

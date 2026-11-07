@@ -168,7 +168,7 @@ async def leader_to_player(player_id: int, db: AsyncSession = Depends(get_db), a
     """A waitlisted (or not yet approved) leader switches to the auction pool."""
     p, pay = await player_and_payment(db, player_id)
     if p.path != "leader" or p.status in ("approved", "rejected", "withdrawn"):
-        raise HTTPException(409, "Only a leader who isn't approved yet can switch")
+        raise HTTPException(409, "Only a captain who isn't approved yet can switch")
     await db.execute(delete(Team).where(Team.leader_player_id == p.id))
     p.path = "auction"
     if p.status == "waitlisted":
@@ -195,7 +195,7 @@ async def new_leader_code(team_id: int, db: AsyncSession = Depends(get_db), admi
     """Revokes the old leader link and issues a new one."""
     team = await db.get(Team, team_id)
     if not team or not team.access_code_hash:
-        raise HTTPException(404, "No approved leader for this team")
+        raise HTTPException(404, "No approved captain for this team")
     code, team.access_code_hash = new_token()
     audit(db, admin, "team.code_reissued", team_id=team.id)
     await db.commit()

@@ -168,15 +168,11 @@ h2.display { font-size: clamp(32px, 5vw, 64px); }
 .stamp.mine strong { color: var(--pink); }
 .stamp .mono { font-size: clamp(16px, 2vw, 28px); background: var(--base); padding: 4px 12px; justify-self: center; }
 @keyframes stamp { from { transform: rotate(-6deg) scale(1.6); } to { transform: rotate(-6deg) scale(1); } }
-.price, .leader-price .digits { animation: bump .3s steps(2); }
 @keyframes bump { from { color: var(--ink); transform: scale(1.08); } }
 
 /* Projector, 16:9 */
 .proj { height: 100vh; display: grid; grid-template-rows: auto 1fr auto auto; gap: 2vh; padding: 2.5vh 3vw; overflow: hidden; }
 .proj-wait { margin: auto; }
-.proj-head { display: flex; justify-content: space-between; align-items: center; font-size: 1vw; }
-.proj-head .mono { font-size: max(14px, 1.3vw); }
-.proj-stage { display: grid; grid-template-columns: 1.15fr 1fr; gap: 3vw; align-items: center; min-height: 0; }
 .proj-card { position: relative; }
 .proj-empty h1 { font-size: 6vw; }
 .pcard.big { padding: 2vw; gap: 2vw; }
@@ -184,58 +180,13 @@ h2.display { font-size: clamp(32px, 5vw, 64px); }
 .pcard.big h3 { font-size: 4.2vw; }
 .pcard.big .pcard-body p { font-size: 1.3vw; }
 .pcard.big .tag { font-size: 1.3vw; padding: 4px 10px; }
-.proj-bid { display: grid; gap: 2vh; }
-.proj-bid p { margin: 0; }
-.proj-bid .price { font-size: 12vw; line-height: .9; color: var(--amber); }
-.proj-bid .lead { display: flex; align-items: center; gap: 1vw; min-height: 5vw; font-size: 2.6vw; }
-.proj-bid .lead img { width: 5vw; height: 5vw; object-fit: cover; }
-.proj-bid .lead .display { font-size: 3vw; }
-.proj-bid .timer-tiles span { height: 2.2vw; }
-.proj-bid .timer .digits { font-size: 3vw; }
-.proj-teams { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: .8vw; }
-.slot { display: flex; gap: .8vw; align-items: center; background: var(--card); border: 1px solid var(--line); padding: .8vw; }
-.slot img { width: 3.4vw; height: 3.4vw; object-fit: cover; }
-.slot p { margin: 0; }
-.slot .mono { font-size: max(13px, 1.3vw); }
-.slot .digits { font-size: 2.2vw; }
-.slot.leading { border-color: var(--amber); box-shadow: inset 0 0 0 2px var(--amber); }
-.slot.gain { animation: gain .9s steps(6); }
-@keyframes gain { 0%, 33%, 66% { background: var(--amber); } 17%, 50%, 83% { background: var(--card); } }
-.pips { display: flex; gap: 3px; }
-.pips span { width: .7vw; height: .7vw; min-width: 6px; min-height: 6px; background: var(--tile); border: 1px solid var(--line); }
-.pips .on { background: var(--pink); border-color: var(--pink); }
-.proj-foot { display: flex; justify-content: space-between; gap: 2vw; font-size: max(14px, 1.3vw); white-space: nowrap; overflow: hidden; }
-.proj-final { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1vw; align-content: start; overflow: hidden; }
-.proj-final header { display: flex; gap: 1vw; align-items: center; margin-bottom: .6vw; }
-.proj-final header img { width: 3vw; height: 3vw; object-fit: cover; }
-.proj-final h3 { font: 400 1.6vw var(--display); text-transform: uppercase; margin: 0; }
-.proj-final ol { list-style: none; margin: 0; padding: 0; }
-.proj-final li { display: flex; justify-content: space-between; border-bottom: 1px solid var(--line); padding: .3vw 0; font-size: 1.25vw; }
 
 /* Leader phone view */
-.leader { max-width: 520px; margin: 0 auto; padding: var(--t); display: grid; gap: var(--t); }
-.leader-head { display: flex; gap: 12px; align-items: center; }
-.leader-head img { width: 56px; height: 56px; object-fit: cover; }
-.leader-head h1 { font-size: 36px; margin: 0; }
-.leader-head p { margin: 0; }
-.leader-stats { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); background: var(--card); }
-.leader-stats div { display: flex; flex-direction: column; padding: 10px 12px; border-right: 1px solid var(--line); }
-.leader-stats div:last-child { border: 0; }
-.leader-stats .digits { font-size: 26px; }
-.leader-lot { position: relative; display: grid; gap: 12px; }
-.leader-lot .stamp strong { font-size: 72px; }
-.leader-price { display: flex; align-items: baseline; gap: 12px; margin: 0; }
-.leader-price .digits { font-size: 56px; color: var(--amber); }
-.bid-btn { position: sticky; bottom: 12px; width: 100%; min-height: 88px; font: 400 40px var(--display); text-transform: uppercase; letter-spacing: .02em;
-  color: var(--base); background: var(--pink); border: 0; cursor: pointer; box-shadow: 0 0 0 4px var(--base); }
-.bid-btn .digits { font-size: 36px; color: var(--base); }
-.bid-btn:active:not(:disabled) { transform: translateY(2px); }
-.bid-btn:disabled { background: var(--card); color: var(--muted); font: 600 18px var(--body); text-transform: none; border: 1px solid var(--line); cursor: not-allowed; }
-.bid-btn.leading:disabled { color: var(--amber); border-color: var(--amber); }
-.roster h2 { margin: 0 0 8px; font-size: 13px; }
-.roster ol { list-style: none; margin: 0; padding: 0; }
-.roster li { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
-.roster.gain { animation: gain .9s steps(6); }
+.captain { max-width: 520px; margin: 0 auto; padding: var(--t); display: grid; gap: var(--t); }
+.captain-head { display: flex; gap: 12px; align-items: center; }
+.captain-head img { width: 56px; height: 56px; object-fit: cover; }
+.captain-head h1 { font-size: 36px; margin: 0; }
+.captain-head p { margin: 0; }
 
 /* Admin live control */
 .controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
@@ -530,3 +481,11 @@ h1.hero-logo { max-width: 860px; width: 100%; margin: 0 auto; justify-content: c
 .policy .actions { margin-top: var(--t); }
 .note .btn { margin-left: 8px; }
 .footer .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Projector: only the player up and the clock. Everything else happens in the room. */
+.proj.proj-solo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4vh; }
+.proj-solo > div:first-child { width: min(46vw, 70vh); }
+.proj-solo .timer { width: min(60vw, 900px); }
+.proj-solo .timer-tiles span { height: 2.4vw; }
+.proj-solo .timer .digits { font-size: 4vw; }
+.proj-solo .proj-empty { text-align: center; }

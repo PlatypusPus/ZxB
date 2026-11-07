@@ -50,13 +50,11 @@ async def snap(c):
     return (await c.get("/api/v1/auction/snapshot")).json()
 
 
-async def bid(c, team, amount=None, proxy=False):
+async def bid(c, team, amount=None):
     s = await snap(c)
     amount = amount if amount is not None else s["lot"]["next_amount"]
     core._hits.clear()   # tests aren't about the 5/s bid limit
-    if proxy:
-        return await c.post(A + "proxy-bid", json={"team_id": team, "lot_id": s["lot"]["id"], "amount": amount}, headers=c.admin)
-    return await c.post("/api/v1/leader/bid", json={"lot_id": s["lot"]["id"], "amount": amount}, headers=lead(team))
+    return await c.post(A + "proxy-bid", json={"team_id": team, "lot_id": s["lot"]["id"], "amount": amount}, headers=c.admin)
 
 
 def credits(s, team):
@@ -124,7 +122,7 @@ async def test_bid_rules(c):  # TC-18, TC-19, TC-21
     assert (await bid(c, 1)).json()["detail"] == "You're the highest bidder"     # TC-21 (team 1 bid exactly 90: TC-18)
     r = await bid(c, 2, 100)
     assert r.status_code == 409 and r.json()["detail"] == "Over max bid"        # TC-19
-    assert (await bid(c, 2, 50)).json()["detail"].startswith("The price moved")  # stale amount
+    assert (await bid(c, 2, 50)).json()["detail"].startswith("Too low")  # stale amount
     s = (await c.post(A + "sold", headers=c.admin)).json()
     assert credits(s, 1) == 10 and credits(s, 2) == 100
 
@@ -136,11 +134,10 @@ async def test_concurrent_bids_one_winner(c):  # TC-20
     await c.post(A + "next", headers=c.admin)
     s = await snap(c)
     lot, amount = s["lot"]["id"], s["lot"]["next_amount"]
-    reqs = [c.post("/api/v1/leader/bid", json={"lot_id": lot, "amount": amount}, headers=lead(t)) for t in range(1, 9) for _ in range(5)]
-    reqs += [c.post(A + "proxy-bid", json={"team_id": t, "lot_id": lot, "amount": amount}, headers=c.admin)
-             for t in (1, 2, 3, 4, 5, 6, 7, 8, 1, 2)]   # 40 leader taps + 10 proxy bids
+    reqs = [c.post(A + "proxy-bid", json={"team_id": t, "lot_id": lot, "amount": amount}, headers=c.admin)
+            for t in range(1, 9) for _ in range(5)]   # 40 double-taps of the same price
     codes = [r.status_code for r in await asyncio.gather(*reqs)]
-    assert len(codes) == 50 and codes.count(200) == 1 and set(codes) <= {200, 409}
+    assert len(codes) == 40 and codes.count(200) == 1 and set(codes) <= {200, 409}
 
 
 async def test_timer_expiry(c):  # TC-22
@@ -206,7 +203,7 @@ async def test_simulated_auction(c, seed_n):  # TC-25, TC-27: 8 bots, 52 players
             free = [t["id"] for t in s["teams"] if not t["blocked"]]
             if not free:
                 break
-            r = await bid(c, rng.choice(free), proxy=rng.random() < 0.2)
+            r = await bid(c, rng.choice(free))
             assert r.status_code == 200, r.text
         result = (await c.post(A + ("unsold" if rng.random() < 0.1 else "sold"), headers=c.admin)).json()
         assert all(t["credits_left"] >= 0 for t in result["teams"])

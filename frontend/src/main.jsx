@@ -28,8 +28,8 @@ const still = matchMedia('(prefers-reduced-motion: reduce)').matches
 
 // Static tier band (CSS): climbs with scroll. The WebGL matrix replaces it when it boots.
 const band = document.querySelector('.band')
-const liveScreen = path === '/projector' || path.startsWith('/leader/')
-if (liveScreen) band.classList.add('top')   // live screens: static grid, lit band fixed at the top
+const liveScreen = path === '/projector'
+if (liveScreen) band.classList.add('top')   // the projector: static grid, lit band fixed at the top
 else if (!showcase) band.remove()
 else {
   const rise = () => {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 // Live auction state over one WebSocket. Every server message carries the full snapshot,
 // so a dropped phone recovers on reconnect with one message. server_now fixes wrong phone clocks.
@@ -41,9 +41,3 @@ export function useCountdown(lot) {
   return Math.max(0, lot.timer_end - serverNow() / 1000)
 }
 
-// Remember the last value across renders (for "was I outbid?" style comparisons).
-export function usePrevious(v) {
-  const r = useRef()
-  useEffect(() => { r.current = v })
-  return r.current
-}

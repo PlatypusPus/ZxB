@@ -87,7 +87,7 @@ async def signup(
              team_name=team_name, team_tag=team_tag)
     errors = validate_profile(d, cfg)
     if path not in ("leader", "auction", "sub"):
-        errors["path"] = "Choose team leader, auction player or sub"
+        errors["path"] = "Choose captain, auction player or sub"
     free = path == "sub"  # the sub pool is free: no UTR, no screenshot
     if path == "leader":
         errors |= validate_team(d)

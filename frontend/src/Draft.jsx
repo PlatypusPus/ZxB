@@ -5,7 +5,7 @@ import { Stamp, TimerTiles } from './Projector.jsx'
 import { Count, Footer, Nav, Schedule, SlotMeter, Ticker } from './Layout.jsx'
 
 const FAQ = [
-  ['Who can sign up?', 'Anyone who plays Valorant. Pay the ₹300 entry, pick team leader or auction player, and wait for verification.'],
+  ['Who can sign up?', 'Anyone who plays Valorant. Pay the ₹300 entry, pick captain or auction player, and wait for verification. The sub pool is free.'],
   ['How is my payment checked?', 'An organiser matches your 12-digit UTR against the receiving account statement. A screenshot alone is not enough, so enter the UTR carefully.'],
   ['How is my rank checked?', 'We open your Riot ID on tracker.gg. If your current or peak rank does not match, your sign-up is rejected with the reason.'],
   ['Will I definitely get a team?', 'Yes. Everyone approved is placed on a team, either by auction or in the final draft round.'],
@@ -57,7 +57,7 @@ function AuctionDemo() {
         </div>
         <Stamp stamp={stamp} />
       </div>
-      <figcaption className="muted">Example lot. On the day it runs live on the projector, and leaders bid from their phones.</figcaption>
+      <figcaption className="muted">Example lot. On the day, captains call their bids out loud in the room and the screen shows the player up and the timer.</figcaption>
     </figure>
   )
 }
@@ -81,7 +81,7 @@ export default function Draft() {
         <section className="hero hero-split wrap">
           <div className="hero-copy">
             <h1 className="display hero-title"><span data-decode>Valorant</span><span className="outline" data-decode>Auction</span></h1>
-            <p className="lede">Lead a team or get drafted. {info?.teams ?? 10} leaders spend {info?.credits_per_team ?? 1000} credits each in a live auction on {info?.event_date || 'a date to be announced'}.</p>
+            <p className="lede">Lead a team or get drafted. {info?.teams ?? 10} captains spend {info?.credits_per_team ?? 1000} credits each in a live auction on {info?.event_date || 'a date to be announced'}.</p>
             <div className="actions">
               {open !== false ? <a className="btn big" href="/signup">Sign up · ₹{info?.fee ?? 300}</a> : <span className="tag">Registration is closed</span>}
               <a className="btn big ghost" href="/projector">Watch the auction</a>
@@ -97,7 +97,7 @@ export default function Draft() {
             <SlotMeter info={info} />
             <dl className="facts">
               <div><dt className="mono muted">TEAMS</dt><dd>{info?.teams ?? 10} teams · 5 + subs</dd></div>
-              <div><dt className="mono muted">ROSTER</dt><dd>Leader + {info?.min_players ?? 4} or more</dd></div>
+              <div><dt className="mono muted">ROSTER</dt><dd>Captain + {info?.min_players ?? 4} or more</dd></div>
               <div><dt className="mono muted">UNSOLD</dt><dd>Round 2 at half price</dd></div>
             </dl>
           </aside>
@@ -110,8 +110,8 @@ export default function Draft() {
           <div className="how">
             <AuctionDemo />
             <ol className="how-steps">
-              <li><strong>Sign up</strong><span>Fill your profile, pick leader or player, pay ₹{info?.fee ?? 300} by UPI and enter the UTR.</span></li>
-              <li><strong>Get drafted</strong><span>{info?.teams ?? 10} leaders bid on players live with {info?.credits_per_team ?? 1000} credits each. Every bid resets the clock.</span></li>
+              <li><strong>Sign up</strong><span>Fill your profile, pick captain or player, pay ₹{info?.fee ?? 300} by UPI and enter the UTR.</span></li>
+              <li><strong>Get drafted</strong><span>{info?.teams ?? 10} captains call out bids on players in the room with {info?.credits_per_team ?? 1000} credits each. Every bid resets the clock.</span></li>
               <li><strong>Play</strong><span>Teams of 5 plus subs play it out. Rosters are public the moment the auction ends.</span></li>
             </ol>
           </div>
@@ -120,13 +120,13 @@ export default function Draft() {
         <section className="wrap split three" data-section>
           <article className="card panel" data-build>
             <p className="mono amber">PATH A · {info?.leader_slots_left ?? 10} OF {info?.teams ?? 10} SLOTS LEFT</p>
-            <h2 className="display">Team leader</h2>
+            <h2 className="display">Captain</h2>
             <p>Create your team: name, tag and logo. You're on your own team for free and never auctioned. You build the rest of the roster with credits.</p>
           </article>
           <article className="card panel" data-build>
             <p className="mono amber">PATH B</p>
             <h2 className="display">Auction player</h2>
-            <p>Show your rank, role and playstyle on your card. Leaders bid for you live. Base price depends on your rank.</p>
+            <p>Show your rank, role and playstyle on your card. Captains bid for you live. Base price depends on your rank.</p>
           </article>
           <article className="card panel" data-build>
             <p className="mono amber">PATH C · FREE</p>
@@ -139,7 +139,7 @@ export default function Draft() {
           <h2 className="display" data-decode>Format and rules</h2>
           <div className="grid3">
             <article className="card" data-build><h3>Credits</h3><p>Every team gets {info?.credits_per_team ?? 1000}. Unspent credits are lost.</p></article>
-            <article className="card" data-build><h3>Rosters</h3><p>Leader plus at least {info?.min_players ?? 4} bought players. A leader can never bid what would leave them short.</p></article>
+            <article className="card" data-build><h3>Rosters</h3><p>Captain plus at least {info?.min_players ?? 4} bought players. A captain can never bid what would leave them short.</p></article>
             <article className="card" data-build><h3>Base prices</h3><p className="small">{info ? Object.entries(info.band_base_price).sort((a, b) => a[1] - b[1]).map(([k, v]) => `${k} ${v}`).join(' · ') : '…'}</p></article>
           </div>
         </section>

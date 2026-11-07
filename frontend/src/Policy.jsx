@@ -20,7 +20,7 @@ function Refund({ fee }) {
       <li>They fill in their own player card. Their rank is checked on tracker.gg like everyone else's.</li>
       <li>Once an organiser approves the swap, your paid entry moves to them. Any arrangement between you and them about the fee is between the two of you.</li>
     </ol>
-    <p>A team leader who swaps out hands over the team: name, tag, logo, credits and any players already bought. Swaps aren't possible once the grand final has started.</p>
+    <p>A captain who swaps out hands over the team: name, tag, logo, credits and any players already bought. Swaps aren't possible once the grand final has started.</p>
 
     <h2>Questions</h2>
     <p>Ask an organiser on the ZenithXBeans Discord before you pay if anything here is unclear.</p>
@@ -50,7 +50,7 @@ function Privacy() {
     <ul>
       <li>To check your payment against the bank statement.</li>
       <li>To check your rank on tracker.gg.</li>
-      <li>To contact you about the auction and your matches. Leaders get their bidding link this way.</li>
+      <li>To contact you about the auction and your matches. Captains get their team link this way.</li>
     </ul>
     <p>We don't sell your details or share them with anyone outside the organising team.</p>
 

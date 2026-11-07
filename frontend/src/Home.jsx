@@ -3,7 +3,9 @@ import { api } from './api.js'
 import { Footer, Nav, Schedule, SlotMeter, Ticker } from './Layout.jsx'
 
 const FAQ = [
-  ['What is ZenithXBeans?', 'A community that runs tournaments for players, by players. Every event is community-funded and every rupee is accounted for in a public ledger.'],
+  ['What is ZenithXBeans?', 'A community that runs Valorant tournaments for players, by players.'],
+  ['How does the bidding work?', 'Captains call their bids out loud in the room and an organiser records each one. The screen shows only the player up and the timer. Every bid resets the timer, and when it runs out the player goes to the highest bid.'],
+  ['How are captains chosen?', 'Anyone can sign up as a captain. The organisers review every captain sign-up and accept one per team slot.'],
   ['Who can enter?', 'Anyone who plays the game. Each tournament page lists its entry fee, format and rules.'],
   ['How are payments checked?', 'An organiser matches your UPI transaction ID (UTR) against the bank statement. Nobody is approved before that check.'],
   ['How do I hear about the next tournament?', 'New events are announced on the ZenithXBeans Discord first, then listed here.'],
@@ -62,9 +64,9 @@ export default function Home() {
           <div className="hero-deck">
             <div className="hero-pitch">
               <h2 className="display">Valorant <span className="pink">Auction</span></h2>
-              <p>{info?.teams ?? 10} team leaders, {info?.credits_per_team ?? 1000} credits each. Every player goes under the hammer live, then the teams fight it out through November.</p>
+              <p>{info?.teams ?? 10} captains, {info?.credits_per_team ?? 1000} credits each. Every player goes under the hammer live, then the teams fight it out through November.</p>
               {open !== false && <div className="actions">
-                <a className="btn" href="/signup?path=leader">Lead a team</a>
+                <a className="btn" href="/signup?path=leader">Be a captain</a>
                 <a className="btn ghost" href="/signup?path=auction">Get auctioned · ₹{info?.fee ?? 300}</a>
                 <a className="btn ghost" href="/signup?path=sub">Sub pool · Free</a>
               </div>}
@@ -79,7 +81,7 @@ export default function Home() {
                 <li><b className="digits">12–16</b><span className="mono muted">NOV</span><span>Group stage</span></li>
                 <li><b className="digits">22</b><span className="mono muted">NOV</span><span>Grand final</span></li>
               </ol>
-              <p className="mono"><span className="amber">{info?.leader_slots_left ?? '–'}</span> OF {info?.teams ?? 10} LEADER SLOTS OPEN</p>
+              <p className="mono"><span className="amber">{info?.leader_slots_left ?? '–'}</span> OF {info?.teams ?? 10} CAPTAIN SLOTS OPEN</p>
             </aside>
           </div>
         </section>
@@ -92,25 +94,25 @@ export default function Home() {
             <header className="auction-head">
               <p className="tags"><span className={'tag' + (open === false ? ' ghost' : '')}>{open === false ? 'SIGN-UPS CLOSED' : 'SIGN-UPS OPEN'}</span><span className="tag ghost">VALORANT</span><span className="tag ghost">{info?.event_date || 'DATE TBA'}</span></p>
               <h3 className="display">{name}</h3>
-              <p className="auction-sub">Team leaders build their rosters by buying players in a live auction. Everyone who signs up and is approved gets a team.</p>
+              <p className="auction-sub">Captains build their rosters by buying players in a live auction. Everyone who signs up and is approved gets a team.</p>
             </header>
 
             <div className="auction-paths">
               <section className="path">
-                <h4 className="display">Team leaders</h4>
+                <h4 className="display">Captains</h4>
                 <p>Name your team, pick a tag and logo. You get <strong className="amber">{info?.credits_per_team ?? 1000} credits</strong> to buy at least {info?.min_players ?? 4} players. You're never auctioned.</p>
                 <ul className="path-list">
                   <li><span>Budget</span><b className="digits">{info?.credits_per_team ?? 1000}</b></li>
                   <li><span>Players to buy</span><b className="digits">{info?.min_players ?? 4}+</b></li>
-                  <li><span>Bid from</span><b>Your phone, live</b></li>
+                  <li><span>Bidding</span><b>Called out in the room</b></li>
                   <li><span>Unspent credits</span><b>Lost at the end</b></li>
                 </ul>
                 <SlotMeter info={info} />
-                {open !== false && <a className="btn" href="/signup?path=leader">Sign up as a leader</a>}
+                {open !== false && <a className="btn" href="/signup?path=leader">Sign up as a captain</a>}
               </section>
               <section className="path">
                 <h4 className="display">Players</h4>
-                <p>Make your player card and go under the hammer. Your <strong className="amber">starting price depends on your rank group</strong>, and leaders bid up from there.</p>
+                <p>Make your player card and go under the hammer. Your <strong className="amber">starting price depends on your rank group</strong>, and captains bid up from there.</p>
                 <RankLadder bands={info?.band_base_price} />
                 {open !== false && <a className="btn" href="/signup?path=auction">Sign up as a player</a>}
               </section>
@@ -160,7 +162,7 @@ export default function Home() {
                 </span>
                 <span className="event-status">
                   <span className={'tag' + (open === false ? ' ghost' : '')}>{open === false ? 'SIGN-UPS CLOSED' : 'SIGN-UPS OPEN'}</span>
-                  {open !== false && info && <span className="mono muted">{info.leader_slots_left} OF {info.teams} LEADER SLOTS LEFT</span>}
+                  {open !== false && info && <span className="mono muted">{info.leader_slots_left} OF {info.teams} CAPTAIN SLOTS LEFT</span>}
                 </span>
                 <svg className="event-go" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15M13 6l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="square" /></svg>
               </a>

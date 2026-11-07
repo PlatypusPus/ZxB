@@ -98,8 +98,8 @@ export function SlotMeter({ info }) {
   const total = info?.teams ?? 10, left = info?.leader_slots_left ?? total
   return (
     <div className="meter">
-      <p className="mono muted">LEADER SLOTS</p>
-      <div className="meter-tiles" role="img" aria-label={`${left} of ${total} leader slots open`}>
+      <p className="mono muted">CAPTAIN SLOTS</p>
+      <div className="meter-tiles" role="img" aria-label={`${left} of ${total} captain slots open`}>
         {Array.from({ length: total }, (_, i) => <span key={i} className={i < total - left ? 'taken' : ''} />)}
       </div>
       <p className="mono"><span className="amber">{left}</span> OF {total} OPEN</p>
@@ -111,7 +111,7 @@ export function Footer() {
   return (
     <footer className="wrap footer" data-section>
       <div className="grid3">
-        <div><a href="/" className="brand" aria-label="ZenithXBeans home"><Logo /></a><p className="muted">Community tournaments, run in the open.</p></div>
+        <div><a href="/" className="brand" aria-label="ZenithXBeans home"><Logo /></a><p className="muted">Community Valorant tournaments.</p></div>
         <div><p><strong>Policies</strong></p><div className="actions"><a className="btn ghost" href="/refund-policy">Refund policy</a><a className="btn ghost" href="/privacy">Privacy</a></div></div>
         <div><p><strong>Contact</strong></p><p className="muted">ZenithXBeans on Discord.</p></div>
       </div>

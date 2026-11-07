@@ -123,7 +123,7 @@ export default function Signup() {
     return (
       <main className="wrap narrow">
         <h1 className="display">You're signed up</h1>
-        <p>Status: <strong>{done.status === 'waitlisted' ? 'Waitlisted (leader slots full)' : free ? 'In the sub pool' : 'Payment submitted'}</strong>. {free ? 'An organiser will check your rank.' : 'An organiser will verify your payment and rank.'}</p>
+        <p>Status: <strong>{done.status === 'waitlisted' ? 'Waitlisted (captain slots full)' : free ? 'In the sub pool' : 'Payment submitted'}</strong>. {free ? 'An organiser will check your rank.' : 'An organiser will verify your payment and rank.'}</p>
         <div className="card">
           <p><strong>Save your edit link.</strong> It's the only way to check your status or change your sign-up.</p>
           <p className="mono break">{link}</p>
@@ -159,7 +159,7 @@ export default function Signup() {
             <legend>How do you want to play?</legend>
             <label className={'card choice' + (v.path === 'auction' ? ' on' : '')}>
               <input type="radio" name="path" checked={v.path === 'auction'} onChange={() => set('path', 'auction')} />
-              <strong>Auction player</strong><span className="muted">Leaders bid for you live.</span>
+              <strong>Auction player</strong><span className="muted">Captains bid for you live.</span>
             </label>
             <label className={'card choice' + (v.path === 'sub' ? ' on' : '')}>
               <input type="radio" name="path" checked={v.path === 'sub'} onChange={() => set('path', 'sub')} />
@@ -168,11 +168,11 @@ export default function Signup() {
             {leaderOpen && (
               <label className={'card choice' + (v.path === 'leader' ? ' on' : '')}>
                 <input type="radio" name="path" checked={v.path === 'leader'} onChange={() => set('path', 'leader')} />
-                <strong>Team leader</strong><span className="muted">{info.leader_slots_left} slots left. Create your team; you're never auctioned.</span>
+                <strong>Captain</strong><span className="muted">{info.leader_slots_left} slots left. Create your team; you're never auctioned.</span>
               </label>
             )}
           </fieldset>
-          {!leaderOpen && <p className="muted">All leader slots are taken, so you can sign up as an auction player.</p>}
+          {!leaderOpen && <p className="muted">All captain slots are taken, so you can sign up as an auction player.</p>}
           {v.path === 'leader' && <>
             <Field label="Team name" name="team_name" err={errors.team_name} required maxLength={24} value={v.team_name} onChange={e => set('team_name', e.target.value)} />
             <Field label="Team tag" name="team_tag" err={errors.team_tag} required maxLength={4} hint="2 to 4 letters" value={v.team_tag} onChange={e => set('team_tag', e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))} />

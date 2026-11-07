@@ -1,4 +1,4 @@
-"""Auction API: admin live control, leader bidding, public snapshot + WebSocket stream, results."""
+"""Auction API: admin live control (bids called in the room, recorded by organisers), captain team page, public snapshot + WebSocket stream, results."""
 import asyncio
 import csv
 import io
@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...core import PUBLIC_DIR, Session, audit, get_db, image_name, process_image, rate_limit_key, require_admin, sha256
+from ...core import PUBLIC_DIR, Session, audit, get_db, image_name, process_image, require_admin, sha256
 from ...models import Team
 from ...tournament import TAG, load, settings
 from ..realtime import hub
@@ -83,7 +83,7 @@ for _name in ("start", "next", "sold", "unsold", "pause", "resume", "undo", "ass
 
 @router.post("/admin/auction/proxy-bid")
 async def proxy_bid(body: dict, db: AsyncSession = Depends(get_db), admin: str = Depends(require_admin)):
-    """For a leader whose phone died. Labelled admin_proxy in the audit log."""
+    """Captains call bids out loud in the room; an organiser records each one here. Labelled admin_proxy in the audit log."""
     bid = await service.place_bid(db, int(body.get("team_id", 0)), int(body.get("lot_id", 0)), int(body.get("amount", 0)), "admin_proxy")
     await push("bid.accepted", team_id=bid.team_id, amount=bid.amount, proxy=True)
     return {"ok": True}
@@ -95,7 +95,7 @@ async def leader_team(authorization: str = Header(""), db: AsyncSession = Depend
     code = authorization.removeprefix("Leader ").strip()
     team = code and await db.scalar(select(Team).where(Team.access_code_hash == sha256(code)))
     if not team:
-        raise HTTPException(401, "This leader link is invalid or was replaced. Ask the organisers for a new one.")
+        raise HTTPException(401, "This captain link is invalid or was replaced. Ask the organisers for a new one.")
     return team
 
 
@@ -104,14 +104,6 @@ async def leader_me(team: Team = Depends(leader_team), db: AsyncSession = Depend
     t, _ = await load(db)
     return {"team_id": team.id, "name": team.name, "tag": team.tag, "logo_url": f"/media/{team.logo}",
             "profile_status": team.profile_status, "editable": not t.locked_at}
-
-
-@router.post("/leader/bid")
-async def leader_bid(body: dict, team: Team = Depends(leader_team), db: AsyncSession = Depends(get_db)):
-    rate_limit_key(f"bid:{team.id}", 5, 1)
-    bid = await service.place_bid(db, team.id, int(body.get("lot_id", 0)), int(body.get("amount", 0)), "leader")
-    await push("bid.accepted", team_id=bid.team_id, amount=bid.amount)
-    return {"ok": True, "amount": bid.amount}
 
 
 @router.patch("/leader/team")

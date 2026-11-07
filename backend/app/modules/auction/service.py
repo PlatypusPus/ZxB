@@ -164,7 +164,7 @@ async def start(db: AsyncSession, actor: str) -> None:
     players = await pool_players(db)
     problems = []
     if len(teams) < 2:
-        problems.append("Need at least 2 approved leaders")
+        problems.append("Need at least 2 approved captains")
     if any(team.profile_status != "approved" for team, _ in teams):
         problems.append("Approve every team's name and logo first")
     if not s["max_players"]:
@@ -235,8 +235,8 @@ async def place_bid(db: AsyncSession, team_id: int, lot_id: int, amount: int, pl
         raise Reject("Time is up")
     top = await highest_bid(db, lot)
     expected = next_amount(lot.base_price, top.amount if top else None, s)
-    if amount != expected:
-        raise Reject(f"The price moved. Next bid is {expected}")
+    if amount < expected:   # bids are called out in the room, so an organiser may record a jump bid
+        raise Reject(f"Too low. Next bid is at least {expected}")
     states = await team_state(db, t, cfg, lot)
     if team_id not in states:
         raise Reject("Unknown team", 404)

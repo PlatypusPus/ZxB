@@ -117,7 +117,7 @@ export default function Draft() {
           </div>
         </section>
 
-        <section className="wrap split" data-section>
+        <section className="wrap split three" data-section>
           <article className="card panel" data-build>
             <p className="mono amber">PATH A · {info?.leader_slots_left ?? 10} OF {info?.teams ?? 10} SLOTS LEFT</p>
             <h2 className="display">Team leader</h2>
@@ -149,15 +149,16 @@ export default function Draft() {
           <Schedule />
         </section>
 
-        <section className="wrap teams" data-section data-pin>
-          <h2 className="display" data-decode>Teams</h2>
-          {teams.length ? <div className="grid4">{teams.map(t => <TeamCard key={t.id} t={t} />)}</div>
-            : <p className="muted">Teams appear here once leaders are approved.</p>}
-        </section>
+        {teams.length > 0 && (
+          <section className="wrap" data-section data-pin>
+            <h2 className="display" data-decode>Teams</h2>
+            <div className="grid4">{teams.map(t => <TeamCard key={t.id} t={t} />)}</div>
+          </section>
+        )}
 
-        <section className="wrap" data-section>
-          <h2 className="display" data-decode>Player pool</h2>
-          {pool.length ? (
+        {pool.length > 0 && (
+          <section className="wrap" data-section>
+            <h2 className="display" data-decode>Player pool</h2>
             <ol className="seats">
               {pool.slice(0, 12).map((p, i) => (
                 <li key={p.id} data-build>
@@ -167,12 +168,12 @@ export default function Draft() {
                 </li>
               ))}
             </ol>
-          ) : <p className="muted">Approved players show up here.</p>}
-        </section>
+          </section>
+        )}
 
         <section className="wrap" data-section>
           <h2 className="display" data-decode>Prize pool</h2>
-          <p className="muted">The prize split and where the fees go will be published here before sign-ups close.</p>
+          <p className="events-note muted">The prize split and where the fees go will be published here before sign-ups close.{!teams.length && ' Teams and the player pool show up on this page once organisers approve sign-ups.'}</p>
         </section>
 
         <section className="wrap" data-section>

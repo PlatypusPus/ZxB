@@ -14,7 +14,7 @@ import os
 
 from ...core import (ADMIN_EMAIL, ADMIN_PASSWORD_HASH, PRIVATE_DIR, PUBLIC_DIR, audit, image_name, mail_html, process_image, send_mail, send_many, SITE, check_password, get_db, new_token,
                      publish, rate_limit, require_admin, sign_admin_token, utcnow)
-from ...models import AuditLog, Payment, Player, Team
+from ...models import AuditLog, Lot, Payment, Player, Team
 from ...tournament import approved_leaders, load, settings
 
 router = APIRouter(prefix="/admin")
@@ -195,6 +195,31 @@ async def withdraw_player(player_id: int, db: AsyncSession = Depends(get_db), ad
     audit(db, admin, "player.withdrawn", player_id=p.id)
     await db.commit()
     return {"status": p.status}
+
+
+@router.post("/players/{player_id}/delete")
+async def delete_player(player_id: int, db: AsyncSession = Depends(get_db), admin: str = Depends(require_admin)):
+    """Remove a sign-up completely: the player, their payment, their team and uploaded files. For junk and test entries."""
+    t, _ = await load(db)
+    if t.locked_at:
+        raise HTTPException(409, "The auction has started")
+    p = await db.get(Player, player_id)
+    if not p:
+        raise HTTPException(404, "Not found")
+    if await db.scalar(select(Lot.id).where(Lot.player_id == p.id).limit(1)):
+        raise HTTPException(409, "This player has been in the auction")
+    pay = await db.scalar(select(Payment).where(Payment.player_id == p.id))
+    team = await db.scalar(select(Team).where(Team.leader_player_id == p.id))
+    files = [(PUBLIC_DIR, p.photo), (PRIVATE_DIR, pay and pay.screenshot), (PUBLIC_DIR, team and team.logo)]
+    await db.execute(delete(Team).where(Team.leader_player_id == p.id))
+    await db.execute(delete(Payment).where(Payment.player_id == p.id))
+    await db.delete(p)
+    audit(db, admin, "player.deleted", player_id=player_id, riot_id=p.riot_id, path=p.path, status=p.status)
+    await db.commit()
+    for folder, name in files:
+        if name and "/" not in name and "\\" not in name:
+            (folder / name).unlink(missing_ok=True)
+    return {"deleted": player_id}
 
 
 @router.post("/players/{player_id}/make-auction-player")

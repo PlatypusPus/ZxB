@@ -614,3 +614,4 @@ textarea:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
 .proj-solo .timer.hot .digits { color: var(--pink); animation: beat .5s ease-in-out infinite alternate; }
 @keyframes beat { to { transform: scale(1.14); } }
 @media (prefers-reduced-motion: reduce) { .sold-to, .proj-solo .timer.hot .digits { animation: none; } .proj-card { transition: none; } }
+.btn.danger { background: #e8445f; border-color: #e8445f; color: #fff; }

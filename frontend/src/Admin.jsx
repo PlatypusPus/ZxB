@@ -67,6 +67,7 @@ function Queue({ call, token }) {
   const shown = rows.filter(r => !pathF || r.path === pathF)
   const [note, setNote] = useState({})
   const [flash, setFlash] = useState('')
+  const [sure, setSure] = useState(null)   // id waiting for a second click on Delete
   const load = () => call(`/admin/queue${filter ? `?status=${filter}` : ''}`).then(setRows).catch(e => setFlash(e.message))
   useEffect(() => { load() }, [filter])
 
@@ -76,7 +77,7 @@ function Queue({ call, token }) {
       const mail = r.emailed === true ? ' Emailed them.' : r.emailed === false ? ' No email sent (no email on file or SMTP not set up).' : ''
       setFlash(r.leader_code
         ? `${row.display_name} approved as captain.${mail} Their captain link (shown once): ${location.origin}/leader/${r.leader_code}`
-        : `${row.display_name}: ${r.status || r.payment_status}.${mail}`)
+        : `${row.display_name}: ${r.deleted ? "deleted" : r.status || r.payment_status}.${mail}`)
       load()
     } catch (e) { setFlash(`${row.display_name}: ${e.message}`) }
   }
@@ -126,6 +127,10 @@ function Queue({ call, token }) {
                       <button className="btn ghost" onClick={() => act(`/admin/players/${r.id}/withdraw`, null, r)}>Withdraw</button>}
                     {['verified', 'rejected'].includes(pay.status) && ['rejected', 'withdrawn', 'waitlisted'].includes(r.status) &&
                       <button className="btn ghost" onClick={() => act(`/admin/payments/${pay.id}/refund`, { note: reason(r) }, r)}>Mark refunded</button>}
+                    {sure === r.id
+                      ? <><button className="btn danger" onClick={() => { setSure(null); act(`/admin/players/${r.id}/delete`, null, r) }}>Delete for good</button>
+                          <button className="btn ghost" onClick={() => setSure(null)}>Keep</button></>
+                      : <button className="btn ghost" onClick={() => setSure(r.id)}>Delete</button>}
                   </div></td>
                 </tr>
               )

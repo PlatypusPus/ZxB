@@ -306,3 +306,20 @@ async def test_announcement_reaches_each_live_participant_once(c, monkeypatch):
     r = await c.post("/api/v1/admin/announce", json=body, headers=c.admin)
     assert r.json() == {"queued": 2}
     assert sorted(m[0] for m in batches[0]) == ["pother@x.in", "psame@x.in"] and "7 pm" in batches[0][0][2]
+
+
+async def test_admin_delete_removes_signup_completely(c):
+    from app.core import Session
+    from sqlalchemy import select
+    from app.models import Payment, Player, Team
+    r = await signup(c, path="leader", riot_id="Gone#DEL")
+    pid = r.json()["player_id"] if "player_id" in r.json() else None
+    rows = (await c.get("/api/v1/admin/queue", headers=c.admin)).json()
+    pid = pid or next(x["id"] for x in rows if x["riot_id"] == "Gone#DEL")
+    assert (await c.post(f"/api/v1/admin/players/{pid}/delete", headers=c.admin)).json() == {"deleted": pid}
+    async with Session() as db:
+        assert await db.get(Player, pid) is None
+        assert not (await db.scalars(select(Payment).where(Payment.player_id == pid))).first()
+        assert not (await db.scalars(select(Team).where(Team.leader_player_id == pid))).first()
+    assert (await c.post(f"/api/v1/admin/players/{pid}/delete", headers=c.admin)).status_code == 404
+    assert (await c.post(f"/api/v1/admin/players/{pid}/delete")).status_code == 401

@@ -134,6 +134,7 @@ export function Footer() {
         <div><p><strong>Contact on Discord</strong></p><Contacts /></div>
       </div>
       <p className="muted small">{RIOT_NOTICE}</p>
+      <div className="made-by"><span className="muted small">Made by</span><a className="made-by-link" href="https://shov.in" target="_blank" rel="noreferrer">shov.in ↗</a></div>
     </footer>
   )
 }

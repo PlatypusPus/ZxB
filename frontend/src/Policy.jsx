@@ -34,6 +34,7 @@ function Privacy() {
 
     <h2>What we collect</h2>
     <ul>
+      <li><strong>Your sign-in:</strong> when you sign in with Discord or Google, we keep your account ID and name, your Discord username, and for Google your email. We never see your password.</li>
       <li><strong>Your player card:</strong> display name, Riot ID, current and peak rank, role, playstyle, quote and photo.</li>
       <li><strong>Contact details:</strong> Discord username and phone number.</li>
       <li><strong>Team leaders:</strong> team name, tag and logo.</li>
@@ -44,7 +45,7 @@ function Privacy() {
     <p>Your player card is shown on the site, on the auction projector and on the stream: display name, Riot ID, ranks, role, playstyle, quote and photo. So are team names, tags and logos once approved, and who bought whom for how much.</p>
 
     <h2>What stays private</h2>
-    <p>Your phone number, Discord username, UTR and payment screenshot are only visible to the organisers. They are never shown on public pages.</p>
+    <p>Your phone number, Discord username, sign-in email, UTR and payment screenshot are only visible to the organisers. They are never shown on public pages.</p>
 
     <h2>Why we use it</h2>
     <ul>

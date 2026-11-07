@@ -46,3 +46,16 @@ The app runs as one pm2 process (`zxb`, port 8030) that serves both the API and 
 ssh core@acrossthe.cloud 'cd ~/shovin/zxb && git pull && (cd backend && ~/.local/bin/uv sync --no-dev --frozen) && (cd frontend && npm ci && npm run build) && pm2 restart zxb'
 ```
 First-time root steps (Postgres role/db, Caddy site): `sudo bash ~/shovin/zxb/deploy/root-setup.sh`. Secrets live in `~/shovin/zxb/.env` (see `.env.example`); uploads in `~/shovin/zxb-data/uploads`.
+
+## Sign-in for registration (Discord and Google)
+
+Registering requires signing in with Discord or Google, one live sign-up per account. Each provider needs an app:
+
+- **Discord:** discord.com/developers/applications, New Application, then OAuth2. Copy the Client ID and Client Secret,
+  and add the redirect `https://zxb.shov.in/api/v1/auth/discord/callback`.
+- **Google:** console.cloud.google.com, APIs & Services, Credentials, Create OAuth client ID (Web application).
+  Add the redirect `https://zxb.shov.in/api/v1/auth/google/callback`. Configure the consent screen and publish it.
+
+Put `PUBLIC_URL`, `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in the
+server `.env`, then `pm2 restart zxb --update-env`. A provider without credentials simply doesn't show a button.
+For local testing, `AUTH_DEV=1` in `.env` adds a fake "Dev login" button. Never set it in production.

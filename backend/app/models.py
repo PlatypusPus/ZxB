@@ -43,6 +43,9 @@ class Player(Base):
         # Riot ID is unique among live sign-ups; a rejected/withdrawn person can sign up again.
         Index("uq_player_riot", "tournament_id", "riot_id_key", unique=True,
               postgresql_where=text("status NOT IN ('rejected', 'withdrawn')")),
+        # One live sign-up per Discord/Google account.
+        Index("uq_player_auth", "tournament_id", "auth_provider", "auth_sub", unique=True,
+              postgresql_where=text("auth_sub IS NOT NULL AND status NOT IN ('rejected', 'withdrawn')")),
     )
     id: Mapped[int] = mapped_column(primary_key=True)
     tournament_id: Mapped[int] = tournament_fk()
@@ -62,6 +65,9 @@ class Player(Base):
     status: Mapped[str] = mapped_column(String(12), default="submitted", index=True)
     reject_reason: Mapped[str] = mapped_column(Text, default="")
     edit_token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    auth_provider: Mapped[str | None] = mapped_column(String(8))   # discord | google (who signed in to register)
+    auth_sub: Mapped[str | None] = mapped_column(String(64))       # the provider's stable account id
+    auth_email: Mapped[str | None] = mapped_column(String(254))
     terms_version: Mapped[str] = mapped_column(String(16))
     terms_accepted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = created()

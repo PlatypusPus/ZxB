@@ -17,7 +17,7 @@ export function Field({ label, name, err, hint, children, ...input }) {
   )
 }
 
-export function ProfileFields({ v, set, errors, info }) {
+export function ProfileFields({ v, set, errors, info, discordLocked }) {
   const ranks = info?.ranks || []
   const pick = (name, label, opts) => (
     <Field label={label} name={name} err={errors[name]} required>
@@ -40,7 +40,7 @@ export function ProfileFields({ v, set, errors, info }) {
       {pick('role', 'Primary role', info?.roles || [])}
       {text('playstyle', 'Playstyle one-liner', { required: true, maxLength: 80, placeholder: 'Aggressive entry, loves Jett' })}
       {text('quote', 'Quote (optional)', { maxLength: 80, hint: 'Shown in italics on your auction card' })}
-      {text('discord', 'Discord username', { required: true, autoComplete: 'off' })}
+      {text('discord', 'Discord username', discordLocked ? { required: true, readOnly: true, hint: 'From your Discord sign-in' } : { required: true, autoComplete: 'off' })}
       {text('phone', 'Phone (WhatsApp)', { required: true, type: 'tel', autoComplete: 'tel-national', inputMode: 'numeric', placeholder: '98765 43210', hint: 'Never shown publicly' })}
     </>
   )
@@ -71,6 +71,16 @@ export default function Signup() {
   const [msg, setMsg] = useState('')
   const [done, setDone] = useState(null)
   useEffect(() => { api('/public').then(setInfo).catch(e => setMsg(e.message)) }, [])
+  const [auth, setAuth] = useState(null)   // { providers, user } from the Discord/Google sign-in
+  useEffect(() => {
+    api('/auth/me').then(a => {
+      setAuth(a)
+      if (a.user?.provider === 'discord') set('discord', a.user.discord)
+      if (a.user && !v.display_name) set('display_name', a.user.name.slice(0, 32))
+    }).catch(() => setAuth({ providers: [], user: null }))
+  }, [])
+  const loginError = new URLSearchParams(location.search).get('login_error')
+  const signOut = async () => { await api('/auth/logout', { method: 'POST' }); setAuth(a => ({ ...a, user: null })) }
 
   const set = (k, val) => { setV(o => ({ ...o, [k]: val })); setErrors(e => ({ ...e, [k]: undefined })) }
   const setFile = (k, f) => {
@@ -134,6 +144,7 @@ export default function Signup() {
     )
   }
   if (info && !info.registration_open) return <main className="wrap narrow"><h1 className="display">Registration is closed</h1><a className="btn" href="/">Back to home</a></main>
+  if (auth && !auth.user) return <SignIn providers={auth.providers} error={loginError} info={info} path={v.path} />
 
   const upi = `upi://pay?pa=${encodeURIComponent(info?.upi_id || '')}&pn=${encodeURIComponent(info?.upi_name || 'ZenithXBeans')}&am=${info?.fee ?? 300}&cu=INR&tn=ZXB%20signup`
   return (
@@ -141,6 +152,8 @@ export default function Signup() {
       <form onSubmit={submit} noValidate className="signup-form">
         <a href="/" className="btn ghost">← {info?.name || 'Home'}</a>
         <h1 className="display" tabIndex={-1}>Sign up</h1>
+        {auth?.user && <p className="signed-in">Signed in as <strong>{auth.user.name}</strong> with {auth.user.provider === 'discord' ? 'Discord' : auth.user.provider === 'google' ? 'Google' : 'a dev login'}{auth.user.email && ` (${auth.user.email})`}. <button type="button" className="btn ghost" onClick={signOut}>Sign out</button></p>}
+        {errors.auth && <p className="err" role="alert">{errors.auth}</p>}
         {already && <p className="note">You've already signed up on this device. Check your status instead of paying twice. <a className="btn ghost" href={`/status/${already}`}>Check my status</a></p>}
         <ol className="steps mono" aria-label="Progress">
           {['Profile', 'Path', free ? 'Confirm' : 'Payment'].map((s, i) => <li key={s} aria-current={i === step ? 'step' : undefined} className={i <= step ? 'on' : ''}>{i + 1}. {s}</li>)}
@@ -148,7 +161,7 @@ export default function Signup() {
         {msg && <p className="err" role="alert">{msg}</p>}
 
         {step === 0 && <>
-          <ProfileFields v={v} set={set} errors={errors} info={info} />
+          <ProfileFields v={v} set={set} errors={errors} info={info} discordLocked={auth?.user?.provider === 'discord'} />
           <Field label="Profile photo (optional)" name="photo" err={errors.photo} hint="Square crop, max 2 MB">
             {id => <input id={id} type="file" accept="image/png,image/jpeg,image/webp" onChange={e => setFile('photo', e.target.files[0])} />}
           </Field>
@@ -228,6 +241,27 @@ export default function Signup() {
           ? <TeamCard t={{ name: v.team_name, tag: v.team_tag, logo_url: files.logo?.url, leader: preview }} />
           : <PlayerCard p={preview} />}
       </aside>
+    </main>
+  )
+}
+
+const PROVIDER_LABEL = { discord: 'Continue with Discord', google: 'Continue with Google', dev: 'Dev login (local only)' }
+
+// Registration needs a Discord or Google sign-in first: one sign-up per account, and a real way to reach people.
+function SignIn({ providers, error, info, path }) {
+  const what = path === 'leader' ? 'as a captain' : path === 'sub' ? 'for the sub pool' : 'as an auction player'
+  return (
+    <main className="wrap narrow signin">
+      <a href="/" className="btn ghost">← {info?.name || 'Home'}</a>
+      <h1 className="display">Sign in to register</h1>
+      <p className="lede">You're signing up {what}. Sign in first so each person registers once and the organisers can reach you.</p>
+      {error && <p className="err" role="alert">{error}</p>}
+      <div className="signin-options">
+        {providers.length ? providers.map(p => (
+          <a key={p} className={'btn signin-' + p} href={`/api/v1/auth/${p}/start`}>{PROVIDER_LABEL[p]}</a>
+        )) : <p className="err">Sign-in isn't set up yet, so registration can't open. Message the organisers on Discord.</p>}
+      </div>
+      <p className="muted small">We only read your name, account ID and, for Google, your email. See the <a href="/privacy">privacy notice</a>.</p>
     </main>
   )
 }

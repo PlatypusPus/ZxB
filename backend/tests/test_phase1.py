@@ -7,6 +7,7 @@ import pytest
 from PIL import Image
 
 from app import core
+from app.modules.auth import issue_identity
 from app.modules.signup import router as signup_mod
 
 pytestmark = pytest.mark.anyio
@@ -21,7 +22,12 @@ def img(fmt="PNG", size=(64, 64), **kw):
 _n = iter(range(10**6))
 
 
-async def signup(c, path="auction", files=None, **kw):
+def signed_in(sub, provider="google"):
+    """Cookie header for someone who signed in with Discord or Google."""
+    return {"cookie": "zxb_id=" + issue_identity(provider, str(sub), f"Person {sub}", discord=f"disc{sub}", email=f"p{sub}@x.in")}
+
+
+async def signup(c, path="auction", files=None, who=None, **kw):
     i = next(_n)
     data = {"display_name": f"Player{i}", "riot_id": f"player{i}#ZXB", "current_rank": "10", "peak_rank": "12",
             "role": "Duelist", "playstyle": "Entry fragger", "discord": f"disc{i}", "phone": "+91 98765 43210",
@@ -34,7 +40,7 @@ async def signup(c, path="auction", files=None, **kw):
     if path == "leader":
         f["logo"] = ("logo.png", img(), "image/png")
     f |= files or {}
-    return await c.post("/api/v1/signup", data=data, files=f)
+    return await c.post("/api/v1/signup", data=data, files=f, headers=signed_in(i if who is None else who))
 
 
 async def queue(c, **params):
@@ -195,7 +201,7 @@ async def test_signup_rate_limit(c):  # TC-34
 async def test_sub_pool_is_free_and_never_auctioned(c):
     data = {"display_name": "Subby", "riot_id": "subby#ZXB", "current_rank": "10", "peak_rank": "12", "role": "Flex",
             "playstyle": "Fills any role", "discord": "subby", "phone": "+91 98765 43210", "path": "sub", "terms": "true"}
-    r = await c.post("/api/v1/signup", data=data)          # no UTR, no screenshot
+    r = await c.post("/api/v1/signup", data=data, headers=signed_in("subby"))   # no UTR, no screenshot
     assert r.status_code == 201, r.text
     assert r.json()["status"] == "verified"
     row = (await queue(c))["subby#ZXB"]
@@ -205,3 +211,18 @@ async def test_sub_pool_is_free_and_never_auctioned(c):
     ok = await c.post(f"/api/v1/admin/players/{row['id']}/approve", headers=c.admin)   # rank check still needed
     assert ok.json()["status"] == "approved"
     assert all(p["riot_id"] != "subby#ZXB" for p in (await c.get("/api/v1/players")).json())
+
+
+async def test_signup_needs_login_and_one_per_account(c):
+    data = {"display_name": "NoLogin", "riot_id": "nologin#ZXB", "current_rank": "10", "peak_rank": "12", "role": "Flex",
+            "playstyle": "Anything", "discord": "x", "phone": "+91 98765 43210", "path": "sub", "terms": "true"}
+    r = await c.post("/api/v1/signup", data=data)
+    assert r.status_code == 401 and "Sign in" in r.json()["detail"]
+    assert (await c.post("/api/v1/signup", data=data, headers={"cookie": "zxb_id=forged.value"})).status_code == 401
+    assert (await c.post("/api/v1/signup", data=data, headers=signed_in("acct1", "discord"))).status_code == 201
+    row = (await queue(c))["nologin#ZXB"]
+    assert row["discord"] == "discacct1" and row["signed_in_with"] == "Discord p" + "acct1@x.in"
+    again = await c.post("/api/v1/signup", data=data | {"riot_id": "other#ZXB"}, headers=signed_in("acct1", "discord"))
+    assert again.status_code == 409 and "already signed up" in again.json()["detail"]["errors"]["auth"]
+    me = (await c.get("/api/v1/auth/me", headers=signed_in("acct1", "discord"))).json()
+    assert me["user"]["provider"] == "discord"

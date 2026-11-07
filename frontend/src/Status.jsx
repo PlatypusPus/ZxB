@@ -42,7 +42,7 @@ export default function Status({ token }) {
       {msg && <p role="status">{msg}</p>}
       {edit ? (
         <form onSubmit={save} noValidate>
-          <ProfileFields v={edit} set={(k, val) => setEdit(o => ({ ...o, [k]: val }))} errors={errors} info={info} />
+          <ProfileFields v={edit} set={(k, val) => setEdit(o => ({ ...o, [k]: val }))} errors={errors} info={info} discordLocked={me.discord_verified} />
           <div className="actions">
             <button type="button" className="btn ghost" onClick={() => setEdit(null)}>Cancel</button>
             <button className="btn">Save changes</button>

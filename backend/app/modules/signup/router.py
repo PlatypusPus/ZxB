@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...core import (PRIVATE_DIR, PUBLIC_DIR, audit, get_db, image_name, new_token, process_image,
                      publish, rate_limit, sha256, utcnow)
 from ...models import Payment, Player, Sale, Team
+from ..auth import require_identity
 from ...tournament import (TERMS_VERSION, approved_leaders, load, public_card, registration_open,
                            validate_profile, validate_team)
 
@@ -16,6 +17,7 @@ router = APIRouter()
 SIGNUP_LIMIT = (5, 600)  # per IP: 5 sign-ups per 10 minutes
 UNIQUE_ERRORS = {
     "uq_player_riot": ("riot_id", "Riot ID already registered"),
+    "uq_player_auth": ("auth", "This account has already signed up. Check your status with your edit link."),
     "payment_utr_key": ("utr", "This UTR has already been used"),
     "uq_team_name": ("team_name", "Team name already taken"),
     "uq_team_tag": ("team_tag", "Team tag already taken"),
@@ -78,6 +80,9 @@ async def signup(
     logo: UploadFile | None = File(None),
 ):
     rate_limit(request, "signup", *SIGNUP_LIMIT)
+    who = require_identity(request)
+    if who["provider"] == "discord":
+        discord = who["discord"]   # verified by Discord, so it can't be typed wrong
     t, cfg = await load(db)
     if not registration_open(t):
         raise HTTPException(403, "Registration is closed")
@@ -119,7 +124,8 @@ async def signup(
                quote=d["quote"], discord=d["discord"], phone=d["phone"], path=path,
                photo=photo_file and photo_file[0].name,
                status="waitlisted" if waitlist else "verified" if free else "submitted", edit_token_hash=token_hash,
-               terms_version=TERMS_VERSION, terms_accepted_at=utcnow())
+               terms_version=TERMS_VERSION, terms_accepted_at=utcnow(),
+               auth_provider=who["provider"], auth_sub=who["sub"], auth_email=who.get("email") or None)
     db.add(p)
     try:
         await db.flush()
@@ -162,6 +168,7 @@ def own_view(p: Player, pay: Payment, team: Team | None, cfg: dict, editable: bo
     return {**public_card(p, cfg), "status": p.status, "reject_reason": p.reject_reason, "path": p.path,
             "discord": p.discord, "phone": p.phone, "payment_status": pay.status,
             "current_rank_tier": p.current_rank_tier, "peak_rank_tier": p.peak_rank_tier, "editable": editable,
+            "discord_verified": p.auth_provider == "discord",
             "team": team and {"name": team.name, "tag": team.tag, "logo_url": f"/media/{team.logo}",
                               "profile_status": team.profile_status}}
 
@@ -190,6 +197,8 @@ async def edit_signup(token: str, body: dict, request: Request, db: AsyncSession
     d = {"display_name": p.display_name, "riot_id": p.riot_id, "playstyle": p.playstyle, "quote": p.quote,
          "discord": p.discord, "phone": p.phone, "role": p.role, "current_rank": p.current_rank_tier,
          "peak_rank": p.peak_rank_tier, "team_name": team.name if team else "", "team_tag": team.tag if team else ""}
+    if p.auth_provider == "discord":
+        body.pop("discord", None)   # verified at sign-in, so it stays as Discord reported it
     d |= {k: body[k] for k in fields + ("team_name", "team_tag") if k in body}
     errors = validate_profile(d, cfg) | (validate_team(d) if team else {})
     if errors:

@@ -2,7 +2,7 @@
 import re
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .core import Session, engine, utcnow
@@ -42,6 +42,11 @@ async def init_db() -> None:
     async with engine.begin() as c:
         # ponytail: create_all until the first deploy; switch to Alembic before Phase 5a.
         await c.run_sync(Base.metadata.create_all)
+        # create_all never alters existing tables, so columns added after the first deploy go here.
+        for col in ("auth_provider varchar(8)", "auth_sub varchar(64)", "auth_email varchar(254)"):
+            await c.execute(text(f"ALTER TABLE player ADD COLUMN IF NOT EXISTS {col}"))
+        await c.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_player_auth ON player (tournament_id, auth_provider, auth_sub) "
+                             "WHERE auth_sub IS NOT NULL AND status NOT IN ('rejected', 'withdrawn')"))
     async with Session() as db:
         if not await db.get(Tournament, 1):
             cfg = GameConfig(game="valorant", data=VALORANT)

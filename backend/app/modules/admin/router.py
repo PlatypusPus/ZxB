@@ -35,6 +35,7 @@ async def queue(status: str = "", db: AsyncSession = Depends(get_db), admin: str
         q = q.where(Player.status == status)
     return [{"id": p.id, "display_name": p.display_name, "riot_id": p.riot_id, "role": p.role, "path": p.path,
              "status": p.status, "reject_reason": p.reject_reason, "phone": p.phone, "discord": p.discord,
+             "signed_in_with": p.auth_provider and f"{p.auth_provider.title()} {p.auth_email or ''}".strip(),
              "current_rank": cfg["ranks"][p.current_rank_tier - 1], "peak_rank": cfg["ranks"][p.peak_rank_tier - 1],
              "photo_url": p.photo and f"/media/{p.photo}", "created_at": p.created_at,
              "tracker_url": cfg["tracker_url"].format(riot_id=quote(p.riot_id, safe="")),

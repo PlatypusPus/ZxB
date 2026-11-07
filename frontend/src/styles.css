@@ -489,3 +489,15 @@ h1.hero-logo { max-width: 860px; width: 100%; margin: 0 auto; justify-content: c
 .proj-solo .timer-tiles span { height: 2.4vw; }
 .proj-solo .timer .digits { font-size: 4vw; }
 .proj-solo .proj-empty { text-align: center; }
+
+/* Sign in before registering */
+.signin { display: grid; gap: var(--t); padding-block: calc(var(--t) * 3); justify-items: start; }
+.signin h1 { margin: 0; font-size: clamp(48px, 7vw, 96px); }
+.signin .lede { margin: 0; max-width: 52ch; }
+.signin-options { display: grid; gap: 12px; width: min(100%, 420px); }
+.signin-options .btn { text-align: center; }
+.signin-discord { background: #5865f2; border-color: #5865f2; color: #fff; }
+.signin-discord:hover { background: #4752c4; border-color: #4752c4; }
+.signin-google { background: var(--ink); border-color: var(--ink); color: var(--base); }
+.signin-google:hover { background: #fff; border-color: #fff; }
+.signed-in { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 var(--t); }

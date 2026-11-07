@@ -4,7 +4,13 @@ const RIOT_NOTICE = "ZenithXBeans' tournaments aren't endorsed by Riot Games and
 
 // The Zen x Beans lockup, used as the home link.
 export function Logo() {
-  return <img className="brand-logo" src="/zxb-logo-nav.webp" width="388" height="96" alt="" />
+  return (
+    <span className="brand-logo" aria-hidden="true">
+      <img className="zen" src="/zen.webp" width="1200" height="405" alt="" />
+      <span className="x">×</span>
+      <img className="beans" src="/beans.webp" width="982" height="558" alt="" />
+    </span>
+  )
 }
 
 const LINKS = [['/', 'Home'], ['/#tournaments', 'Tournaments'], ['/draft', 'Valorant Auction']]

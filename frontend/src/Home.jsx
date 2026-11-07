@@ -16,6 +16,15 @@ function EventDate({ date }) {
   return <span className="event-when"><b className="digits">{ok ? d : 'TBA'}</b><span className="mono">{ok ? m?.toUpperCase() : 'DATE'}</span></span>
 }
 
+// Whole days from today until an event date like "11 Nov 2026"; null if it can't be read.
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+function daysUntil(date) {
+  const [d, m, y] = (date || '').split(' '), mi = MONTHS.indexOf((m || '').slice(0, 3).toLowerCase())
+  if (!/^\d{1,2}$/.test(d || '') || mi < 0 || !/^\d{4}$/.test(y || '')) return null
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  return Math.round((new Date(+y, mi, +d) - today) / 864e5)
+}
+
 // Rank groups and their starting credits, highest first. The organiser sets the numbers in Admin -> Settings.
 function RankLadder({ bands }) {
   const rows = Object.entries(bands || {}).sort((a, b) => b[1] - a[1])
@@ -38,6 +47,7 @@ export default function Home() {
   useEffect(() => { api('/public').then(setInfo).catch(() => {}) }, [])
   const open = info?.registration_open
   const name = info?.name || 'ZenithXBeans Valorant Auction'
+  const days = daysUntil(info?.event_date)
 
   return (
     <>
@@ -49,6 +59,29 @@ export default function Home() {
             <span className="x" aria-label="x">×</span>
             <img className="beans" src="/beans.webp" width="982" height="558" alt="Beans" fetchpriority="high" />
           </h1>
+          <div className="hero-deck">
+            <div className="hero-pitch">
+              <h2 className="display">Valorant <span className="pink">Auction</span></h2>
+              <p>{info?.teams ?? 10} team leaders, {info?.credits_per_team ?? 1000} credits each. Every player goes under the hammer live, then the teams fight it out through November.</p>
+              {open !== false && <div className="actions">
+                <a className="btn" href="/signup?path=leader">Lead a team</a>
+                <a className="btn ghost" href="/signup?path=auction">Get auctioned · ₹{info?.fee ?? 300}</a>
+                <a className="hero-sub" href="/signup?path=sub">Or join the sub pool, free →</a>
+              </div>}
+            </div>
+            <aside className="hero-count" aria-label="Key dates">
+              {days != null && days >= 0 && <p className="hero-days">
+                <b className="digits">{String(days).padStart(2, '0')}</b>
+                <span className="mono">{days === 0 ? 'AUCTION IS TODAY' : `${days === 1 ? 'DAY' : 'DAYS'} TO THE AUCTION`}</span>
+              </p>}
+              <ol className="hero-dates">
+                <li><b className="digits">11</b><span className="mono muted">NOV</span><span>Auction</span></li>
+                <li><b className="digits">12–16</b><span className="mono muted">NOV</span><span>Group stage</span></li>
+                <li><b className="digits">22</b><span className="mono muted">NOV</span><span>Grand final</span></li>
+              </ol>
+              <p className="mono"><span className="amber">{info?.leader_slots_left ?? '–'}</span> OF {info?.teams ?? 10} LEADER SLOTS OPEN</p>
+            </aside>
+          </div>
         </section>
 
         <Ticker text={`ZenithXBeans · community tournaments · ${name} · ${open === false ? 'sign-ups closed' : 'sign-ups open'} · `} />

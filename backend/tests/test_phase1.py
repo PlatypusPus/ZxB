@@ -243,6 +243,10 @@ async def test_email_account_register_login_and_result_email(c, monkeypatch):
     unverified = {"cookie": "zxb_id=" + r.cookies["zxb_id"]}
     assert (await c.get("/api/v1/auth/me", headers=unverified)).json()["user"]["verified"] is False
     assert (await signup(c, "sub", headers=unverified)).status_code == 403
+    await signup(c, "sub", riot_id="follower#ZXB", follows="skipped:2")
+    await signup(c, "sub", riot_id="junk#ZXB", follows="<script>")
+    rows = await queue(c)
+    assert rows["follower#ZXB"]["follows"] == "skipped:2" and rows["junk#ZXB"]["follows"] is None
     assert (await c.get("/api/v1/auth/verify?t=forged.sig")).headers["location"] == "/verified?error=1"
     v = await c.get(links[0].replace("http://127.0.0.1:5180", ""))
     assert v.status_code == 303 and v.headers["location"] == "/verified"

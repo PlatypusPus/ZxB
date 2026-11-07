@@ -76,7 +76,7 @@ async def signup(
     display_name: str = Form(""), riot_id: str = Form(""), current_rank: int = Form(0), peak_rank: int = Form(0),
     role: str = Form(""), playstyle: str = Form(""), quote: str = Form(""), discord: str = Form(""),
     phone: str = Form(""), path: str = Form("auction"), team_name: str = Form(""), team_tag: str = Form(""),
-    utr: str = Form(""), terms: bool = Form(False),
+    utr: str = Form(""), terms: bool = Form(False), follows: str = Form(""),
     screenshot: UploadFile | None = File(None), photo: UploadFile | None = File(None),
     logo: UploadFile | None = File(None),
 ):
@@ -123,6 +123,7 @@ async def signup(
     p = Player(display_name=d["display_name"], riot_id=d["riot_id"], riot_id_key=d["riot_id"].lower(),
                current_rank_tier=current_rank, peak_rank_tier=peak_rank, role=role, playstyle=d["playstyle"],
                quote=d["quote"], discord=d["discord"], phone=d["phone"], path=path,
+               follows=follows if re.fullmatch(r"followed|skipped:[0-3]", follows) else None,
                photo=photo_file and photo_file[0].name,
                status="waitlisted" if waitlist else "verified" if free else "submitted", edit_token_hash=token_hash,
                terms_version=TERMS_VERSION, terms_accepted_at=utcnow(),

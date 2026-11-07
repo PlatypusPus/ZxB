@@ -559,3 +559,17 @@ textarea:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
 .announce-confirm p, .announce-confirm .actions { margin: 0; }
 .notfound .display { font-size: clamp(56px, 10vw, 128px); }
 .signin .actions { flex-wrap: wrap; } .signin .actions .btn { white-space: nowrap; }
+
+/* Sign-up: Instagram follow step */
+.follow .mono { margin: 0; }
+.follow-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; width: min(100%, 520px); counter-reset: f; }
+.follow-list li { display: flex; align-items: center; gap: 16px; padding: 12px 12px 12px 16px; background: var(--card); border: 1px solid var(--line); counter-increment: f; }
+.follow-list li::before { content: counter(f); font: 400 28px/1 var(--display); color: var(--muted); width: 18px; }
+.follow-list li.on { border-color: var(--amber); }
+.follow-list li.on::before { color: var(--amber); }
+.follow-handle { flex: 1; min-width: 0; font-weight: 700; font-size: 18px; overflow-wrap: anywhere; }
+.follow-list .btn { min-width: 128px; }
+.follow .btn.big { width: min(100%, 520px); }
+.follow .btn.big:disabled { cursor: not-allowed; }
+.skip { background: none; border: 0; padding: 4px 0; color: var(--muted); font: 13px var(--body); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; margin-top: -8px; }
+.skip:hover { color: var(--ink); }

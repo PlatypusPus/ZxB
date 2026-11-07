@@ -47,7 +47,7 @@ export function ProfileFields({ v, set, errors, info }) {
 }
 
 const EMPTY = { display_name: '', riot_id: '', current_rank: '', peak_rank: '', role: '', playstyle: '', quote: '',
-  discord: '', phone: '', path: 'auction', team_name: '', team_tag: '', utr: '', terms: false }
+  discord: '', phone: '', path: 'auction', team_name: '', team_tag: '', utr: '', terms: false, follows: '' }
 
 // Answers survive a trip to the UPI app (mobile browsers often discard a backgrounded tab). Files can't be stored.
 const DRAFT = 'zxb-signup-draft'
@@ -144,6 +144,7 @@ export default function Signup() {
   if (info && !info.registration_open) return <main className="wrap narrow"><h1 className="display">Registration is closed</h1><a className="btn" href="/">Back to home</a></main>
   if (auth?.user && auth.user.verified === false) return <CheckEmail user={auth.user} info={info} onSignOut={signOut} onCheck={loadAuth} />
   if (auth && !auth.user) return <SignIn providers={auth.providers} error={loginError} info={info} path={v.path} onDone={loadAuth} />
+  if (auth?.user && !v.follows) return <FollowGate info={info} onDone={x => { set('follows', x); scrollTo(0, 0) }} />
 
   const upi = `upi://pay?pa=${encodeURIComponent(info?.upi_id || '')}&pn=${encodeURIComponent(info?.upi_name || 'ZenithXBeans')}&am=${info?.fee ?? 300}&cu=INR&tn=ZXB%20signup`
   return (
@@ -312,6 +313,38 @@ function CheckEmail({ user, info, onSignOut, onCheck }) {
         <button type="button" className="btn ghost" disabled={busy} onClick={resend}>Send the link again</button>
         <button type="button" className="btn ghost" onClick={onSignOut}>Use a different email</button>
       </div>
+    </main>
+  )
+}
+
+// Updates go out on Instagram. Following is required in spirit: Continue unlocks once all three are opened,
+// with a small skip for people who can't (no Instagram account).
+const INSTAGRAM = ['shankssays', 'whoshanks', 'ttvpeachysmolbean']
+
+function FollowGate({ info, onDone }) {
+  const [opened, setOpened] = useState([])
+  const all = opened.length === INSTAGRAM.length
+  return (
+    <main className="wrap narrow signin follow">
+      <a href="/" className="btn ghost">← {info?.name || 'Home'}</a>
+      <p className="mono amber">REQUIRED BEFORE YOU SIGN UP</p>
+      <h1 className="display">Follow to play</h1>
+      <p className="lede">Auction times, match schedules, results and future tournaments are announced on these Instagram accounts first. Follow all three to continue.</p>
+      <ol className="follow-list">
+        {INSTAGRAM.map(h => {
+          const done = opened.includes(h)
+          return (
+            <li key={h} className={done ? 'on' : ''}>
+              <span className="follow-handle">@{h}</span>
+              <a className={'btn' + (done ? ' ghost' : '')} href={`https://www.instagram.com/${h}/`} target="_blank" rel="noreferrer"
+                onClick={() => setOpened(o => o.includes(h) ? o : [...o, h])}>{done ? 'Opened ✓' : 'Follow'}</a>
+            </li>
+          )
+        })}
+      </ol>
+      <p className="muted small" role="status">{all ? 'All three opened. Thanks!' : `${opened.length} of 3 opened. Tap Follow on each, then come back to this tab.`}</p>
+      <button type="button" className="btn big" disabled={!all} onClick={() => onDone('followed')}>I’ve followed all three</button>
+      <button type="button" className="skip" onClick={() => onDone(`skipped:${opened.length}`)}>Skip for now</button>
     </main>
   )
 }

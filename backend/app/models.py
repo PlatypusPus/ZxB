@@ -68,7 +68,7 @@ class Player(Base):
     auth_provider: Mapped[str | None] = mapped_column(String(8))   # discord | google (who signed in to register)
     auth_sub: Mapped[str | None] = mapped_column(String(64))       # the provider's stable account id
     auth_email: Mapped[str | None] = mapped_column(String(254))
-    follows: Mapped[str | None] = mapped_column(String(16))   # Instagram step: "followed" or "skipped:<opened>"
+    follows: Mapped[str | None] = mapped_column(String(16))   # follow step: "followed" or "skipped:<opened>"
     terms_version: Mapped[str] = mapped_column(String(16))
     terms_accepted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = created()

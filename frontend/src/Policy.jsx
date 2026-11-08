@@ -52,12 +52,13 @@ function Terms({ fee }) {
     <h2>The auction and matches</h2>
     <ul>
       <li>Captains bid for players live, in the room, with the credits they're given. The organisers record every bid; their record is final.</li>
-      <li>Schedules, formats and rules are announced on the site and our Instagram accounts, and can change if needed. We'll tell participants by email when they do.</li>
+      <li>Schedules, formats and rules are announced on the site and our Instagram, Twitch and YouTube channels, and can change if needed. We'll tell participants by email when they do.</li>
       <li>Play fair. Cheating, account sharing, smurfing, abuse or harassment of other players can get you removed from the event without a refund.</li>
     </ul>
 
     <h2>Prizes</h2>
     <p>Any prizes are announced before the event and paid to the winning team as announced. A sub who plays for a winning team receives the prize share of the teammate they replaced, for the matches they played. Organisers settle any disputes about prizes.</p>
+    <p>Players must follow our channels listed at sign-up (Instagram @shankssays, @whoshanks and @ttvpeachysmolbean; Twitch peachysmolbean; YouTube @ShanksSays and @peachysmolbeanlive). A player found not following any of them forfeits their share of the prize pool.</p>
 
     <h2>Your content</h2>
     <p>You let us show your display name, Riot ID, rank, role, playstyle, quote, photo, and your team's name, tag and logo on the site, the auction screen and our social media for the event. Don't upload anything you don't have the right to use or that's offensive; we may remove it.</p>

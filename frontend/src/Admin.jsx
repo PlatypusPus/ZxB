@@ -105,7 +105,7 @@ function Queue({ call, token }) {
               return (
                 <tr key={r.id}>
                   <td><strong>{r.display_name}</strong><br /><a href={r.tracker_url} target="_blank" rel="noreferrer" className="mono">{r.riot_id} ↗</a><br /><span className="muted small">{r.phone} · {r.discord}{r.signed_in_with && <><br />via {r.signed_in_with}</>}
-                    <br />{r.follows === 'followed' ? 'Instagram: followed all 3' : r.follows ? `Instagram: skipped (opened ${r.follows.split(':')[1]}/3)` : 'Instagram: not asked'}</span></td>
+                    <br />{r.follows === 'followed' ? 'Socials: followed all' : r.follows ? `Socials: skipped (opened ${r.follows.split(':')[1]})` : 'Socials: not asked'}</span></td>
                   <td>{r.current_rank}<br /><span className="muted">peak {r.peak_rank}</span><br />{r.role}</td>
                   <td>{PATH[r.path] || r.path}{r.team && <><br /><span className="muted">{r.team.name} [{r.team.tag}]</span></>}</td>
                   <td className="mono">{pay.utr}<br />₹{pay.amount} · {pay.status}</td>

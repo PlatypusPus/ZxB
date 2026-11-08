@@ -314,33 +314,41 @@ export function CheckEmail({ user, info, onSignOut, onCheck }) {
   )
 }
 
-// Updates go out on Instagram. Following is required in spirit: Continue unlocks once all three are opened,
-// with a small skip for people who can't (no Instagram account).
-const INSTAGRAM = ['shankssays', 'whoshanks', 'ttvpeachysmolbean']
+// Updates go out on these channels. Continue unlocks once every one is opened, with a small skip for people
+// who can't. Not following forfeits the player's prize share (see the terms).
+const FOLLOW = [
+  ['Instagram', '@shankssays', 'https://www.instagram.com/shankssays/'],
+  ['Instagram', '@whoshanks', 'https://www.instagram.com/whoshanks/'],
+  ['Instagram', '@ttvpeachysmolbean', 'https://www.instagram.com/ttvpeachysmolbean/'],
+  ['Twitch', 'peachysmolbean', 'https://www.twitch.tv/peachysmolbean'],
+  ['YouTube', '@ShanksSays', 'https://www.youtube.com/@ShanksSays'],
+  ['YouTube', '@peachysmolbeanlive', 'https://www.youtube.com/@peachysmolbeanlive'],
+]
 
 function FollowGate({ info, onDone }) {
   const [opened, setOpened] = useState([])
-  const all = opened.length === INSTAGRAM.length
+  const all = opened.length === FOLLOW.length
   return (
     <main className="wrap narrow signin follow">
       <a href="/" className="btn ghost">← {info?.name || 'Home'}</a>
       <p className="mono amber">REQUIRED BEFORE YOU SIGN UP</p>
       <h1 className="display">Follow to play</h1>
-      <p className="lede">Auction times, match schedules, results and future tournaments are announced on these Instagram accounts first. Follow all three to continue.</p>
+      <p className="lede">Auction times, match schedules, results and future tournaments are announced on these channels first. Follow all six to continue.</p>
+      <p className="follow-warn"><strong>Players found not following any of these forfeit their share of the prize pool.</strong></p>
       <ol className="follow-list">
-        {INSTAGRAM.map(h => {
-          const done = opened.includes(h)
+        {FOLLOW.map(([site, h, url]) => {
+          const done = opened.includes(url)
           return (
-            <li key={h} className={done ? 'on' : ''}>
-              <span className="follow-handle">@{h}</span>
-              <a className={'btn' + (done ? ' ghost' : '')} href={`https://www.instagram.com/${h}/`} target="_blank" rel="noreferrer"
-                onClick={() => setOpened(o => o.includes(h) ? o : [...o, h])}>{done ? 'Opened ✓' : 'Follow'}</a>
+            <li key={url} className={done ? 'on' : ''}>
+              <span className="follow-handle"><span className="follow-site">{site}</span>{h}</span>
+              <a className={'btn' + (done ? ' ghost' : '')} href={url} target="_blank" rel="noreferrer"
+                onClick={() => setOpened(o => o.includes(url) ? o : [...o, url])}>{done ? 'Opened ✓' : site === 'Instagram' ? 'Follow' : 'Subscribe'}</a>
             </li>
           )
         })}
       </ol>
-      <p className="muted small" role="status">{all ? 'All three opened. Thanks!' : `${opened.length} of 3 opened. Tap Follow on each, then come back to this tab.`}</p>
-      <button type="button" className="btn big" disabled={!all} onClick={() => onDone('followed')}>I’ve followed all three</button>
+      <p className="muted small" role="status">{all ? 'All six opened. Thanks!' : `${opened.length} of ${FOLLOW.length} opened. Tap each one, then come back to this tab.`}</p>
+      <button type="button" className="btn big" disabled={!all} onClick={() => onDone('followed')}>I’ve followed all six</button>
       <button type="button" className="skip" onClick={() => onDone(`skipped:${opened.length}`)}>Skip for now</button>
     </main>
   )

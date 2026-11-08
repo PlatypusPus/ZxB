@@ -560,7 +560,7 @@ textarea:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
 .notfound .display { font-size: clamp(56px, 10vw, 128px); }
 .signin .actions { flex-wrap: wrap; } .signin .actions .btn { white-space: nowrap; }
 
-/* Sign-up: Instagram follow step */
+/* Sign-up: follow step */
 .follow .mono { margin: 0; }
 .follow-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; width: min(100%, 520px); counter-reset: f; }
 .follow-list li { display: flex; align-items: center; gap: 16px; padding: 12px 12px 12px 16px; background: var(--card); border: 1px solid var(--line); counter-increment: f; }
@@ -615,3 +615,5 @@ textarea:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
 @keyframes beat { to { transform: scale(1.14); } }
 @media (prefers-reduced-motion: reduce) { .sold-to, .proj-solo .timer.hot .digits { animation: none; } .proj-card { transition: none; } }
 .btn.danger { background: #e8445f; border-color: #e8445f; color: #fff; }
+.follow-warn { margin: 0; padding: 12px 16px; border: 1px solid var(--pink); color: var(--ink); width: min(100%, 520px); }
+.follow-site { display: block; font: 700 11px var(--body); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }

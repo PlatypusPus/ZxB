@@ -123,7 +123,7 @@ async def signup(
     p = Player(display_name=d["display_name"], riot_id=d["riot_id"], riot_id_key=d["riot_id"].lower(),
                current_rank_tier=current_rank, peak_rank_tier=peak_rank, role=role, playstyle=d["playstyle"],
                quote=d["quote"], discord=d["discord"], phone=d["phone"], path=path,
-               follows=follows if re.fullmatch(r"followed|skipped:[0-3]", follows) else None,
+               follows=follows if re.fullmatch(r"followed|skipped:[0-6]", follows) else None,
                photo=photo_file and photo_file[0].name,
                status="waitlisted" if waitlist else "verified" if free else "submitted", edit_token_hash=token_hash,
                terms_version=TERMS_VERSION, terms_accepted_at=utcnow(),

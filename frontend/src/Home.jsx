@@ -11,7 +11,7 @@ const FAQ = [
   ['How do I hear about the next tournament?', 'New events are announced first on Instagram (@shankssays, @whoshanks, @ttvpeachysmolbean), Twitch (peachysmolbean) and YouTube (@ShanksSays, @peachysmolbeanlive), then listed here.'],
 ]
 
-// "22 Nov 2026" -> a big day number over the month. Anything else shows TBA.
+// "13 Nov 2026" -> a big day number over the month. Anything else shows TBA.
 function EventDate({ date }) {
   const [d, m] = (date || '').split(' ')
   const ok = /^\d{1,2}$/.test(d || '')
@@ -92,7 +92,7 @@ export default function Home() {
           <h2 className="display" data-decode>Featured tournament</h2>
           <article className="card auction-card" data-build>
             <header className="auction-head">
-              <p className="tags"><span className={'tag' + (open === false ? ' ghost' : '')}>{open === false ? 'SIGN-UPS CLOSED' : 'SIGN-UPS OPEN'}</span><span className="tag ghost">VALORANT</span><span className="tag ghost">{info?.event_date || 'DATE TBA'}</span></p>
+              <p className="tags"><span className={'tag' + (open === false ? ' ghost' : '')}>{open === false ? 'SIGN-UPS CLOSED' : 'SIGN-UPS OPEN'}</span><span className="tag ghost">VALORANT</span><span className="tag ghost">AUCTION {info?.event_date || 'DATE TBA'}</span><span className="tag ghost">TOURNAMENT DATES TBA</span></p>
               <h3 className="display">{name}</h3>
               <p className="auction-sub">Captains build their rosters by buying players in a live auction. Everyone who signs up and is approved gets a team.</p>
             </header>
@@ -127,9 +127,9 @@ export default function Home() {
 
             <dl className="auction-facts">
               <div><dt className="mono muted">ENTRY</dt><dd>₹{info?.fee ?? 300}</dd></div>
-              <div><dt className="mono muted">SUBS</dt><dd>Free</dd></div>
               <div><dt className="mono muted">TEAMS</dt><dd>{info?.teams ?? 10}</dd></div>
-              <div><dt className="mono muted">GRAND FINAL</dt><dd>22 Nov</dd></div>
+              <div><dt className="mono muted">AUCTION</dt><dd>Fri {info?.event_date?.replace(/ \d{4}$/, '') || 'TBA'}</dd></div>
+              <div><dt className="mono muted">TOURNAMENT</dt><dd>TBA</dd></div>
             </dl>
             <div className="actions"><a className="btn ghost" href="/draft">Full format and rules</a><a className="btn ghost" href="/refund-policy">Refund policy</a></div>
           </article>

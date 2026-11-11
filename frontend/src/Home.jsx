@@ -77,9 +77,9 @@ export default function Home() {
                 <span className="mono">{days === 0 ? 'AUCTION IS TODAY' : `${days === 1 ? 'DAY' : 'DAYS'} TO THE AUCTION`}</span>
               </p>}
               <ol className="hero-dates">
-                <li><b className="digits">11</b><span className="mono muted">NOV</span><span>Auction</span></li>
-                <li><b className="digits">12–16</b><span className="mono muted">NOV</span><span>Group stage</span></li>
-                <li><b className="digits">22</b><span className="mono muted">NOV</span><span>Grand final</span></li>
+                <li><b className="digits">13</b><span className="mono muted">NOV · FRI</span><span>Auction</span></li>
+                <li><b className="digits">TBA</b><span className="mono muted">DATES</span><span>Group stage</span></li>
+                <li><b className="digits">TBA</b><span className="mono muted">DATES</span><span>Grand final</span></li>
               </ol>
               <p className="mono"><span className="amber">{info?.leader_slots_left ?? '–'}</span> OF {info?.teams ?? 10} CAPTAIN SLOTS OPEN</p>
             </aside>

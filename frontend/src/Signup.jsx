@@ -228,7 +228,12 @@ export default function Signup() {
 const PROVIDER_LABEL = { google: 'Continue with Google', dev: 'Dev login (local only)' }
 
 // Registration needs an account first: one sign-up per account, and an email to send the result to.
+const IN_APP = [['Instagram', /Instagram/], ['WhatsApp', /WhatsApp/], ['Facebook', /FBAN|FBAV|FB_IAB/], ['Snapchat', /Snapchat/],
+  ['LinkedIn', /LinkedInApp/], ['Telegram', /Telegram/], ['Discord', /Discord/], ['Line', /\bLine\//]]
+const inAppBrowser = () => IN_APP.find(([, re]) => re.test(navigator.userAgent))?.[0]
+
 export function SignIn({ providers, error, info, path, onDone, heading = 'Sign in to register', lede }) {
+  const inApp = inAppBrowser()
   const what = path === 'leader' ? 'as a captain' : path === 'sub' ? 'for the sub pool' : 'as an auction player'
   const [mode, setMode] = useState('register')
   const [f, setF] = useState({ name: '', email: '', password: '' })
@@ -252,6 +257,11 @@ export function SignIn({ providers, error, info, path, onDone, heading = 'Sign i
       <h1 className="display">{heading}</h1>
       <p className="lede">{lede || `You're signing up ${what}. Make an account first so each person registers once. We email your result, like whether you're selected as a captain, to this address.`}</p>
       {msg && <p className="err" role="alert">{msg}</p>}
+      {inApp && providers.includes('google') && <p className="follow-warn" role="note">
+        <strong>Google sign-in doesn’t work inside the {inApp} app’s browser.</strong> Open this page in Chrome or Safari
+        (tap ⋮ or ⋯, then “Open in browser”), or use your email below.
+        {/Android/i.test(navigator.userAgent) && <><br /><a className="btn ghost" href={`intent://${location.host}${location.pathname}${location.search}#Intent;scheme=https;package=com.android.chrome;end`}>Open in Chrome</a></>}
+      </p>}
       <div className="signin-options">
         {providers.map(p => <a key={p} className={'btn signin-' + p} href={`/api/v1/auth/${p}/start`}>{PROVIDER_LABEL[p] || p}</a>)}
       </div>
@@ -274,19 +284,25 @@ export function SignIn({ providers, error, info, path, onDone, heading = 'Sign i
 // Email accounts must click the link we send before they can register.
 export function CheckEmail({ user, info, onSignOut, onCheck }) {
   const [msg, setMsg] = useState(''), [busy, setBusy] = useState(false)
+  useEffect(() => {   // coming back from the mail app: check again without a tap
+    const back = () => document.visibilityState === 'visible' && onCheck()
+    document.addEventListener('visibilitychange', back)
+    return () => document.removeEventListener('visibilitychange', back)
+  }, [])
   const resend = async () => {
     setBusy(true); setMsg('')
     try {
       const r = await api('/auth/resend', { method: 'POST' })
       if (r.verified) return onCheck()
-      setMsg(r.emailed ? 'Sent again. Check your inbox and spam folder.' : 'We couldn’t send the email just now. Try again in a few minutes.')
+      setMsg('Sent again. It can take a minute; check Spam and Promotions too.')
     } catch (e) { setMsg(e.message) } finally { setBusy(false) }
   }
   return (
     <main className="wrap narrow signin">
       <a href="/" className="btn ghost">← {info?.name || 'Home'}</a>
       <h1 className="display">Check your email</h1>
-      <p className="lede">We sent a link to <strong>{user.email}</strong>. Open it to verify your email, then you can finish signing up. Already clicked it?</p>
+      <p className="lede">We sent a link to <strong>{user.email}</strong>. Open it to verify your email, then you can finish signing up. It can take a minute to arrive; if it isn’t in your inbox, check <strong>Spam</strong> and <strong>Promotions</strong>.</p>
+      <p className="muted">Typo in the email? Use a different email below, or sign in with Google instead.</p>
       {msg && <p role="status">{msg}</p>}
       <div className="actions">
         <button type="button" className="btn" onClick={onCheck}>I’ve verified, continue</button>

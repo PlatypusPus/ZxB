@@ -16,7 +16,7 @@ import time
 import urllib.parse
 import urllib.request
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from sqlalchemy import select
@@ -187,7 +187,7 @@ def _account_input(body: dict) -> tuple[str, str]:
 
 
 @router.post("/auth/register")
-async def register(body: dict, request: Request, db: AsyncSession = Depends(get_db)):
+async def register(body: dict, request: Request, tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     rate_limit(request, "register", 10, 600)
     email, pw = _account_input(body)
     name, e = str(body.get("name", "")).strip(), {}
@@ -205,8 +205,8 @@ async def register(body: dict, request: Request, db: AsyncSession = Depends(get_
         await db.commit()
     except IntegrityError:
         raise HTTPException(409, {"errors": {"email": "This email already has an account. Log in instead."}})
-    emailed = await send_verification(db, acct)
-    return _set_identity(JSONResponse({"ok": True, "emailed": emailed}, 201), issue_identity("email", str(acct.id), name, email=email))
+    await send_verification(db, acct, tasks)
+    return _set_identity(JSONResponse({"ok": True, "emailed": True}, 201), issue_identity("email", str(acct.id), name, email=email))
 
 
 @router.post("/auth/login")
@@ -234,18 +234,22 @@ async def logout():
 VERIFY_HOURS = 48
 
 
-async def send_verification(db: AsyncSession, acct: Account) -> bool:
+def _deliver(to: str, subject: str, text: str, html_body: str, link: str) -> None:
+    if not send_mail(to, subject, text, html_body):
+        logging.warning("Verification email to %s failed", to)
+        if os.environ.get("AUTH_DEV") == "1":
+            logging.warning("Dev verification link for %s: %s", to, link)
+
+
+async def send_verification(db: AsyncSession, acct: Account, tasks: BackgroundTasks) -> None:
+    """Queues the email to go out after the response, so the page doesn't wait on the mail server (2-5 s)."""
     t, _ = await load(db)
     link = f"{PUBLIC_URL}/api/v1/auth/verify?t={_sign('verify', {'a': acct.id, 'e': acct.email}, VERIFY_HOURS)}"
     lines = [f"Hi {acct.name},", f"Confirm this is your email to finish signing up for {t.name}. "
              "Your selection result and event announcements will be sent here.",
              f"The link works for {VERIFY_HOURS} hours. If you didn't make an account, ignore this email."]
-    ok = await asyncio.to_thread(send_mail, acct.email, f"{t.name}: verify your email",
-                                 "\n\n".join(lines[:2] + [link] + lines[2:]),
-                                 mail_html("Verify your email", lines, ("Verify my email", link)))
-    if not ok and os.environ.get("AUTH_DEV") == "1":
-        logging.warning("Dev verification link for %s: %s", acct.email, link)
-    return ok
+    tasks.add_task(_deliver, acct.email, f"{t.name}: verify your email", "\n\n".join(lines[:2] + [link] + lines[2:]),
+                   mail_html("Verify your email", lines, ("Verify my email", link)), link)
 
 
 @router.get("/auth/verify")
@@ -262,10 +266,11 @@ async def verify(t: str = "", db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/auth/resend")
-async def resend(request: Request, db: AsyncSession = Depends(get_db)):
+async def resend(request: Request, tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     who = require_identity(request)
     rate_limit(request, "resend", 3, 600)
     acct = who["provider"] == "email" and await db.get(Account, int(who["sub"]))
     if not acct or acct.verified_at:
         return {"emailed": False, "verified": True}
-    return {"emailed": await send_verification(db, acct), "verified": False}
+    await send_verification(db, acct, tasks)
+    return {"emailed": True, "verified": False}

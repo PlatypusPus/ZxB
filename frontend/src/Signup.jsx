@@ -274,6 +274,7 @@ export function SignIn({ providers, error, info, path, onDone, heading = 'Sign i
         {mode === 'register' && input('name', 'Your name', { autoComplete: 'name', maxLength: 64 })}
         {input('email', 'Email', { type: 'email', autoComplete: 'email', maxLength: 254 })}
         {input('password', 'Password', { type: 'password', autoComplete: mode === 'login' ? 'current-password' : 'new-password', minLength: 8, maxLength: 128, hint: mode === 'register' ? 'At least 8 characters' : undefined })}
+        {mode === 'register' && <p className="muted small">We’ll email you a link to verify. If it’s not in your inbox, check Spam.</p>}
         <button className="btn" disabled={busy}>{busy ? 'One moment…' : mode === 'login' ? 'Log in' : 'Create account'}</button>
       </form>
       <p className="muted small">We keep your name and email, and never see your Google password. By continuing you agree to the <a href="/terms">terms of service</a> and <a href="/privacy">privacy notice</a>.</p>
@@ -301,7 +302,8 @@ export function CheckEmail({ user, info, onSignOut, onCheck }) {
     <main className="wrap narrow signin">
       <a href="/" className="btn ghost">← {info?.name || 'Home'}</a>
       <h1 className="display">Check your email</h1>
-      <p className="lede">We sent a link to <strong>{user.email}</strong>. Open it to verify your email, then you can finish signing up. It can take a minute to arrive; if it isn’t in your inbox, check <strong>Spam</strong> and <strong>Promotions</strong>.</p>
+      <p className="lede">We sent a link to <strong>{user.email}</strong>. Open it to verify your email, then you can finish signing up.</p>
+      <p className="follow-warn" role="note"><strong>Not in your inbox? Check your Spam and Promotions folders.</strong> The email is from ZenithXBeans and can take a minute to arrive. If it’s in Spam, tap “Not spam” so our next emails reach you.</p>
       <p className="muted">Typo in the email? Use a different email below, or sign in with Google instead.</p>
       {msg && <p role="status">{msg}</p>}
       <div className="actions">

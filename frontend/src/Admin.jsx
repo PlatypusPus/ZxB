@@ -108,11 +108,12 @@ function Queue({ call, token }) {
                     <br />{r.follows === 'followed' ? 'Socials: followed all' : r.follows ? `Socials: skipped (opened ${r.follows.split(':')[1]})` : 'Socials: not asked'}</span></td>
                   <td>{r.current_rank}<br /><span className="muted">peak {r.peak_rank}</span><br />{r.role}</td>
                   <td>{PATH[r.path] || r.path}{r.team && <><br /><span className="muted">{r.team.name} [{r.team.tag}]</span></>}</td>
-                  <td className="mono">{pay.utr}<br />₹{pay.amount} · {pay.status}</td>
-                  <td>{pay.screenshot ? <Shot name={pay.screenshot} token={token} /> : <span className="muted">Free sub</span>}</td>
+                  <td className="mono">{pay.status === 'due' ? <>Fee due<br />₹{pay.amount} · not paid yet</> : <>{pay.utr}<br />₹{pay.amount} · {pay.status}</>}</td>
+                  <td>{pay.screenshot ? <Shot name={pay.screenshot} token={token} /> : <span className="muted">{pay.status === 'due' ? 'Pays later' : 'Free sub'}</span>}</td>
                   <td>{r.status}{r.reject_reason && <><br /><span className="muted small">{r.reject_reason}</span></>}</td>
                   <td><div className="acts">
                     <input placeholder="Reason / note" aria-label={`Reason for ${r.display_name}`} value={note[r.id] || ''} onChange={e => setNote({ ...note, [r.id]: e.target.value })} />
+                    {pay.status === 'due' && <button className="btn" onClick={() => act(`/admin/payments/${pay.id}/verify`, null, r)}>Mark fee paid</button>}
                     {pay.status === 'submitted' && <>
                       <button className="btn" onClick={() => act(`/admin/payments/${pay.id}/verify`, null, r)}>Verify payment</button>
                       <button className="btn ghost" onClick={() => needReason(() => act(`/admin/payments/${pay.id}/reject`, { reason: reason(r) }, r), r)}>Reject payment</button>
@@ -173,7 +174,7 @@ function Teams({ call }) {
 const STATUS = { draft: 'Draft (hidden)', registration_open: 'Open for sign-ups', registration_closed: 'Closed' }
 const SECTIONS = [
   { title: 'Event', note: 'What players see on the site.', fields: [
-    { k: 'event_date', label: 'Event date', kind: 'text', hint: 'Shown on the site, e.g. 11 Nov 2026' },
+    { k: 'event_date', label: 'Auction date', kind: 'text', hint: 'Shown on the site, e.g. 13 Nov 2026' },
     { k: 'registration_opens_at', label: 'Registration opens', kind: 'time', hint: 'Optional, India time' },
     { k: 'registration_closes_at', label: 'Registration closes', kind: 'time', hint: 'Optional, India time' },
   ] },

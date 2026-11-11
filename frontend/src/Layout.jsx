@@ -65,24 +65,24 @@ export function Count({ value, prefix = '' }) {
 // Leader slots as tiles: red = taken, outlined = still open.
 // ponytail: fixed schedule for this event; move into settings when there is a second tournament.
 const SCHEDULE = [
-  ['11', 'Wed', 'Auction', 'Leaders bid on registered players. Unsold players go again at half price.', ''],
-  ['12–16', 'Thu–Mon', 'Group stage', '10 teams in 2 groups of 5, single round robin. Both groups play 2 matches a day; each team plays 4 and has one bye day.', 'BO1'],
-  ['17', 'Tue', 'Buffer day', 'Kept free for reschedules.', ''],
-  ['18', 'Wed', 'Upper bracket round 1', 'Top 3 from each group qualify.', 'BO3'],
-  ['19', 'Thu', 'Lower bracket round 1', '', 'BO3'],
-  ['20', 'Fri', 'Upper semifinals + lower round 2', 'Seeds 1 and 2 join here.', 'BO3'],
-  ['21', 'Sat', 'Upper final + lower final', '', 'BO3'],
-  ['22', 'Sun', 'Grand final', '', 'BO5'],
+  ['13', 'Fri', 'Auction', 'Captains bid on registered players. Unsold players go again at half price.', ''],
+  ['TBA', '', 'Group stage', '10 teams in 2 groups of 5, single round robin. Both groups play 2 matches a day; each team plays 4 and has one bye day.', 'BO1'],
+  ['TBA', '', 'Buffer day', 'Kept free for reschedules.', ''],
+  ['TBA', '', 'Upper bracket round 1', 'Top 3 from each group qualify.', 'BO3'],
+  ['TBA', '', 'Lower bracket round 1', '', 'BO3'],
+  ['TBA', '', 'Upper semifinals + lower round 2', 'Seeds 1 and 2 join here.', 'BO3'],
+  ['TBA', '', 'Upper final + lower final', '', 'BO3'],
+  ['TBA', '', 'Grand final', '', 'BO5'],
 ]
 const SEEDS = ['Group A winner', 'Group B winner', 'Group A runner-up', 'Group B runner-up', 'Group A 3rd', 'Group B 3rd']
 
 export function Schedule() {
   return (
     <div className="schedule">
-      <ol className="sched" aria-label="November 2026 schedule">
+      <ol className="sched" aria-label="Schedule">
         {SCHEDULE.map(([d, day, h, p, fmt]) => (
           <li key={h} data-build>
-            <span className="sched-date"><b className="digits">{d}</b><span className="mono muted">NOV · {day.toUpperCase()}</span></span>
+            <span className="sched-date"><b className="digits">{d}</b><span className="mono muted">{day ? `NOV · ${day.toUpperCase()}` : 'DATE'}</span></span>
             <span><strong>{h}</strong>{p && <span className="muted"> {p}</span>}</span>
             {fmt && <span className="tag ghost">{fmt}</span>}
           </li>

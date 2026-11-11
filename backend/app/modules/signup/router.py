@@ -76,8 +76,8 @@ async def signup(
     display_name: str = Form(""), riot_id: str = Form(""), current_rank: int = Form(0), peak_rank: int = Form(0),
     role: str = Form(""), playstyle: str = Form(""), quote: str = Form(""), discord: str = Form(""),
     phone: str = Form(""), path: str = Form("auction"), team_name: str = Form(""), team_tag: str = Form(""),
-    utr: str = Form(""), terms: bool = Form(False), follows: str = Form(""),
-    screenshot: UploadFile | None = File(None), photo: UploadFile | None = File(None),
+    terms: bool = Form(False), follows: str = Form(""),
+    photo: UploadFile | None = File(None),
     logo: UploadFile | None = File(None),
 ):
     rate_limit(request, "signup", *SIGNUP_LIMIT)
@@ -94,23 +94,18 @@ async def signup(
     errors = validate_profile(d, cfg)
     if path not in ("leader", "auction", "sub"):
         errors["path"] = "Choose captain, auction player or sub"
-    free = path == "sub"  # the sub pool is free: no UTR, no screenshot
+    free = path == "sub"  # the sub pool is free
     if path == "leader":
         errors |= validate_team(d)
         if not logo or not logo.filename:
             errors["logo"] = "Upload your team logo"
-    utr = re.sub(r"\s", "", utr)
-    if not free and not re.fullmatch(r"\d{12}", utr):
-        errors["utr"] = "The UTR is the 12-digit number in your UPI app's payment details"
-    if not free and (not screenshot or not screenshot.filename):
-        errors["screenshot"] = "Upload the payment screenshot"
     if not terms:
         errors["terms"] = "You need to accept the rules, refund policy and privacy notice"
     if errors:
         raise HTTPException(422, {"errors": errors})
 
     # Validate every image in memory first, so a bad upload writes nothing to disk.
-    files: list[tuple] = [] if free else [(PRIVATE_DIR / image_name(), process_image(await screenshot.read(2**21 + 1), "screenshot", False))]
+    files: list[tuple] = []
     photo_file = None
     if photo and photo.filename:
         photo_file = (PUBLIC_DIR / image_name(), process_image(await photo.read(2**21 + 1), "photo", True))
@@ -131,8 +126,9 @@ async def signup(
     db.add(p)
     try:
         await db.flush()
-        # Subs get a ₹0 payment row that is already verified, so the approval flow (rank check) is unchanged.
-        db.add(Payment(player_id=p.id, amount=t.settings["fee"], utr=utr, screenshot=files[0][0].name) if not free else
+        # The entry fee is collected later to confirm the spot: paid entries start "due" and an organiser marks
+        # them paid. Subs get a ₹0 payment row that is already verified, so the approval flow is unchanged.
+        db.add(Payment(player_id=p.id, amount=t.settings["fee"], utr=f"DUE{p.id}", screenshot="", status="due") if not free else
                Payment(player_id=p.id, amount=0, utr=f"FREE{p.id}", screenshot="", status="verified",
                        verified_by="free sub pool", verified_at=utcnow()))
         if path == "leader":
@@ -186,7 +182,7 @@ def own_view(p: Player, pay: Payment, team: Team | None, cfg: dict, editable: bo
 
 
 def editable(p: Player, pay: Payment) -> bool:
-    return pay.status == "submitted" or (p.path == "sub" and p.status == "verified")
+    return pay.status in ("submitted", "due") or (p.path == "sub" and p.status == "verified")
 
 
 @router.get("/me/signup")

@@ -3,7 +3,7 @@ import { api } from './api.js'
 import { PlayerCard, TeamCard } from './Cards.jsx'
 
 const MAX = 2 * 1024 * 1024
-const STEP_OF = { team_name: 1, team_tag: 1, logo: 1, path: 1, utr: 2, screenshot: 2, terms: 2 } // rest are step 0
+const STEP_OF = { team_name: 1, team_tag: 1, logo: 1, path: 1, terms: 2 } // rest are step 0
 
 export function Field({ label, name, err, hint, children, ...input }) {
   const id = 'f-' + name
@@ -90,7 +90,7 @@ export default function Signup() {
   const preview = { ...v, current_rank: ranks[v.current_rank - 1], peak_rank: ranks[v.peak_rank - 1], photo_url: files.photo?.url }
 
   const required = [['display_name', 'riot_id', 'current_rank', 'peak_rank', 'role', 'playstyle', 'phone'],
-    v.path === 'leader' ? ['team_name', 'team_tag'] : [], ['utr']]
+    v.path === 'leader' ? ['team_name', 'team_tag'] : [], []]
   const next = () => {
     const e = Object.fromEntries(required[step].filter(k => !String(v[k]).trim()).map(k => [k, 'Required']))
     if (step === 1 && v.path === 'leader' && !files.logo) e.logo = 'Upload your team logo'
@@ -105,13 +105,11 @@ export default function Signup() {
     ev.preventDefault()
     if (step < 2) return next()
     const e = {}
-    if (!free && !/^\d{12}$/.test(v.utr.replace(/\s/g, ''))) e.utr = 'Enter the 12-digit UTR from your UPI app'
-    if (!free && !files.screenshot) e.screenshot = 'Upload the payment screenshot'
     if (!v.terms) e.terms = 'Tick this to continue'
     if (Object.keys(e).length) { setErrors(e); return focusFirst(e) }
     const form = new FormData()
-    Object.entries(v).forEach(([k, val]) => !(free && k === 'utr') && form.append(k, val))
-    Object.entries(files).forEach(([k, o]) => o && !(free && k === 'screenshot') && (k !== 'logo' || v.path === 'leader') && form.append(k, o.f))
+    Object.entries(v).forEach(([k, val]) => k !== 'utr' && form.append(k, val))
+    Object.entries(files).forEach(([k, o]) => o && k !== 'screenshot' && (k !== 'logo' || v.path === 'leader') && form.append(k, o.f))
     setBusy(true); setMsg('')
     try {
       const r = await api('/signup', { method: 'POST', form })
@@ -144,7 +142,6 @@ export default function Signup() {
   if (auth && !auth.user) return <SignIn providers={auth.providers} error={loginError} info={info} path={v.path} onDone={loadAuth} />
   if (auth?.user && !v.follows) return <FollowGate info={info} onDone={x => { set('follows', x); scrollTo(0, 0) }} />
 
-  const upi = `upi://pay?pa=${encodeURIComponent(info?.upi_id || '')}&pn=${encodeURIComponent(info?.upi_name || 'ZenithXBeans')}&am=${info?.fee ?? 300}&cu=INR&tn=ZXB%20signup`
   return (
     <main className="wrap signup">
       <form onSubmit={submit} noValidate className="signup-form">
@@ -153,7 +150,7 @@ export default function Signup() {
         {auth?.user && <p className="signed-in">Signed in as <strong>{auth.user.name}</strong> with {auth.user.provider === 'google' ? 'Google' : auth.user.provider === 'email' ? 'your email' : 'a dev login'}{auth.user.email && ` (${auth.user.email})`}. Your result is emailed there. <button type="button" className="btn ghost" onClick={signOut}>Sign out</button></p>}
         {errors.auth && <p className="err" role="alert">{errors.auth}</p>}
         <ol className="steps mono" aria-label="Progress">
-          {['Profile', 'Path', free ? 'Confirm' : 'Payment'].map((s, i) => <li key={s} aria-current={i === step ? 'step' : undefined} className={i <= step ? 'on' : ''}>{i + 1}. {s}</li>)}
+          {['Profile', 'Path', 'Confirm'].map((s, i) => <li key={s} aria-current={i === step ? 'step' : undefined} className={i <= step ? 'on' : ''}>{i + 1}. {s}</li>)}
         </ol>
         {msg && <p className="err" role="alert">{msg}</p>}
 
@@ -198,25 +195,11 @@ export default function Signup() {
           <p>If the team you sub for wins the tournament, you get the prize share of the teammate you replaced, for the matches you played.</p>
         </section>}
         {step === 2 && <>
-          {!free && <>
-          <section className="card pay" aria-labelledby="pay-h">
-            <h2 id="pay-h" className="pay-amount"><span className="digits">₹{info?.fee ?? 300}</span> <span>by UPI</span></h2>
-            <ol className="pay-steps">
-              <li>
-                <strong>Pay exactly ₹{info?.fee ?? 300}</strong> to <strong>{info?.upi_name || 'ZenithXBeans'}</strong>
-                {info?.upi_id ? <> at <code>{info.upi_id}</code></> : <span className="err"> (the UPI ID isn't published yet, so you can't pay today)</span>}
-                {info?.upi_id && info.upi_qr_url && <img src={info.upi_qr_url} alt={`UPI QR code for ${info.upi_id}`} className="qr" />}
-                {info?.upi_id && <a className="btn ghost mobile-only" href={upi}>Open my UPI app</a>}
-              </li>
-              <li><strong>Copy the 12-digit UTR</strong> from the payment details. Apps also call it UPI reference or transaction ID.</li>
-              <li><strong>Paste it below</strong> with a screenshot of the payment. We check it against the bank statement.</li>
-            </ol>
-          </section>
-          <Field label="UTR (12 digits)" name="utr" err={errors.utr} required inputMode="numeric" maxLength={14} autoComplete="off" value={v.utr} onChange={e => set('utr', e.target.value.replace(/[^\d ]/g, ''))} />
-          <Field label="Payment screenshot" name="screenshot" required err={errors.screenshot} hint="Max 2 MB. Only organisers can see it.">
-            {id => <input id={id} type="file" accept="image/png,image/jpeg,image/webp" onChange={e => setFile('screenshot', e.target.files[0])} />}
-          </Field>
-          </>}
+          {!free && <section className="card pay" aria-labelledby="pay-h">
+            <h2 id="pay-h" className="pay-amount"><span className="digits">₹{info?.fee ?? 300}</span> <span>paid later</span></h2>
+            <p><strong>You don’t pay anything today.</strong> The ₹{info?.fee ?? 300} entry fee is collected later to confirm your spot. We’ll email you how and when to pay.</p>
+            <p>The whole prize pool is made up of entry fees, so every confirmed spot adds to it.</p>
+          </section>}
           <div className="field">
             <label className="check">
               <input id="f-terms" type="checkbox" checked={v.terms} onChange={e => set('terms', e.target.checked)} aria-describedby={errors.terms ? 'terms-e' : undefined} />
@@ -228,7 +211,7 @@ export default function Signup() {
 
         <div className="actions">
           {step > 0 && <button type="button" className="btn ghost" onClick={() => setStep(step - 1)}>Back</button>}
-          <button className="btn" disabled={busy || (step === 2 && !free && !info?.upi_id)}>{step < 2 ? 'Next' : busy ? 'Submitting…' : 'Submit sign-up'}</button>
+          <button className="btn" disabled={busy}>{step < 2 ? 'Next' : busy ? 'Submitting…' : 'Submit sign-up'}</button>
         </div>
       </form>
 

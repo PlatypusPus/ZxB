@@ -44,8 +44,8 @@ function Terms({ fee }) {
 
     <h2>Signing up and paying</h2>
     <ul>
-      <li>Auction players and captains pay a ₹{fee} entry fee by UPI. The sub pool is free.</li>
-      <li>Organisers verify every payment and rank before approving a sign-up, and decide who becomes a captain. Captain places are limited.</li>
+      <li>Auction players and captains pay a ₹{fee} entry fee by UPI. It isn't taken at sign-up: it's collected later to confirm your place. The whole prize pool is made up of entry fees. The sub pool is free.</li>
+      <li>Organisers verify every payment and rank before approving a sign-up, and decide who becomes a captain. Captain places are limited; a captain sign-up that isn't accepted moves into the auction player pool.</li>
       <li>Fees aren't refunded, but you can swap your place with another player. See the <a href="/refund-policy">refund policy</a>.</li>
     </ul>
 

@@ -5,8 +5,9 @@ import { Stamp, TimerTiles } from './Projector.jsx'
 import { Count, Footer, Nav, Schedule, SlotMeter, Ticker } from './Layout.jsx'
 
 const FAQ = [
-  ['Who can sign up?', 'Anyone who plays Valorant. Pay the ₹300 entry, pick captain or auction player, and wait for verification. The sub pool is free.'],
-  ['How is my payment checked?', 'An organiser matches your 12-digit UTR against the receiving account statement. A screenshot alone is not enough, so enter the UTR carefully.'],
+  ['Who can sign up?', 'Anyone who plays Valorant. Pick captain or auction player and sign up for free today; the ₹300 entry fee is collected later to confirm your spot. The sub pool is free.'],
+  ['When do I pay?', 'Not at sign-up. The entry fee is collected later to confirm your spot, and we email everyone how and when to pay. The whole prize pool is made up of entry fees.'],
+  ['What if I’m not picked as a captain?', 'You stay in: your sign-up moves into the auction player pool and captains bid for you on auction day.'],
   ['How is my rank checked?', 'We open your Riot ID on tracker.gg. If your current or peak rank does not match, your sign-up is rejected with the reason.'],
   ['Will I definitely get a team?', 'Yes. Everyone approved is placed on a team, either by auction or in the final draft round.'],
   ['Can I edit my sign-up?', 'Yes, from your edit link, until an organiser starts checking it or registration closes.'],
@@ -83,7 +84,7 @@ export default function Draft() {
             <h1 className="display hero-title"><span data-decode>Valorant</span><span className="outline" data-decode>Auction</span></h1>
             <p className="lede">Lead a team or get drafted. {info?.teams ?? 10} captains spend {info?.credits_per_team ?? 1000} credits each in a live auction on {info?.event_date || 'a date to be announced'}.</p>
             <div className="actions">
-              {open !== false ? <a className="btn big" href="/signup">Sign up · ₹{info?.fee ?? 300}</a> : <span className="tag">Registration is closed</span>}
+              {open !== false ? <a className="btn big" href="/signup">Sign up</a> : <span className="tag">Registration is closed</span>}
               <a className="btn big ghost" href="/projector">Watch the auction</a>
             </div>
             <div className="hero-strip">
@@ -103,14 +104,14 @@ export default function Draft() {
           </aside>
         </section>
 
-        <Ticker text={`${name} · ${info?.event_date || 'date TBA'} · ₹${info?.fee ?? 300} entry · `} />
+        <Ticker text={`${name} · auction ${info?.event_date || 'date TBA'} · tournament dates TBA · ₹${info?.fee ?? 300} entry, paid later · `} />
 
         <section className="wrap" data-section>
           <h2 className="display" data-decode>How it works</h2>
           <div className="how">
             <AuctionDemo />
             <ol className="how-steps">
-              <li><strong>Sign up</strong><span>Fill your profile, pick captain or player, pay ₹{info?.fee ?? 300} by UPI and enter the UTR.</span></li>
+              <li><strong>Sign up</strong><span>Fill your profile, pick captain or player. The ₹{info?.fee ?? 300} entry is collected later to confirm your spot.</span></li>
               <li><strong>Get drafted</strong><span>{info?.teams ?? 10} captains call out bids on players in the room with {info?.credits_per_team ?? 1000} credits each. Every bid resets the clock.</span></li>
               <li><strong>Play</strong><span>Teams of 5 plus subs play it out. Rosters are public the moment the auction ends.</span></li>
             </ol>
@@ -173,7 +174,7 @@ export default function Draft() {
 
         <section className="wrap" data-section>
           <h2 className="display" data-decode>Prize pool</h2>
-          <p className="events-note muted">The prize split and where the fees go will be published here before sign-ups close.{!teams.length && ' Teams and the player pool show up on this page once organisers approve sign-ups.'}</p>
+          <p className="events-note muted">The entire prize pool is made up of entry fees. The split will be published here before the tournament starts.{!teams.length && ' Teams and the player pool show up on this page once organisers approve sign-ups.'}</p>
         </section>
 
         <section className="wrap" data-section>

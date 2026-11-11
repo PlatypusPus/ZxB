@@ -5,9 +5,9 @@ import { Footer, Nav, Schedule, SlotMeter, Ticker } from './Layout.jsx'
 const FAQ = [
   ['What is ZenithXBeans?', 'A community that runs Valorant tournaments for players, by players.'],
   ['How does the bidding work?', 'Captains call their bids out loud in the room and an organiser records each one. The screen shows only the player up and the timer. Every bid resets the timer, and when it runs out the player goes to the highest bid.'],
-  ['How are captains chosen?', 'Anyone can sign up as a captain. The organisers review every captain sign-up and accept one per team slot.'],
+  ['How are captains chosen?', 'Anyone can sign up as a captain. The organisers review every captain sign-up and accept one per team slot. Captains who aren’t picked move into the auction player pool.'],
   ['Who can enter?', 'Anyone who plays the game. Each tournament page lists its entry fee, format and rules.'],
-  ['How are payments checked?', 'An organiser matches your UPI transaction ID (UTR) against the bank statement. Nobody is approved before that check.'],
+  ['When do I pay?', 'Not at sign-up. The entry fee is collected later to confirm your spot, and the whole prize pool is made up of entry fees.'],
   ['How do I hear about the next tournament?', 'New events are announced first on Instagram (@shankssays, @whoshanks, @ttvpeachysmolbean), Twitch (peachysmolbean) and YouTube (@ShanksSays, @peachysmolbeanlive), then listed here.'],
 ]
 
@@ -64,10 +64,10 @@ export default function Home() {
           <div className="hero-deck">
             <div className="hero-pitch">
               <h2 className="display">Valorant <span className="pink">Auction</span></h2>
-              <p>{info?.teams ?? 10} captains, {info?.credits_per_team ?? 1000} credits each. Every player goes under the hammer live, then the teams fight it out through November.</p>
+              <p>{info?.teams ?? 10} captains, {info?.credits_per_team ?? 1000} credits each. Every player goes under the hammer live, on Friday 13 November, then the teams fight it out. Tournament dates TBA.</p>
               {open !== false && <div className="actions">
                 <a className="btn" href="/signup?path=leader">Be a captain</a>
-                <a className="btn ghost" href="/signup?path=auction">Get auctioned · ₹{info?.fee ?? 300}</a>
+                <a className="btn ghost" href="/signup?path=auction">Get auctioned</a>
                 <a className="btn ghost" href="/signup?path=sub">Sub pool · Free</a>
               </div>}
             </div>
@@ -143,8 +143,8 @@ export default function Home() {
         <section className="wrap" data-section>
           <h2 className="display" data-decode>How it works</h2>
           <div className="grid3">
-            {[['01', 'Sign up', 'Pick a tournament, fill your player card and pay the entry by UPI.'],
-              ['02', 'Get verified', 'Organisers check your payment against the bank statement and your rank on tracker.gg.'],
+            {[['01', 'Sign up', 'Pick a tournament and fill your player card. The entry fee is collected later to confirm your spot.'],
+              ['02', 'Get verified', 'Organisers check your rank on tracker.gg and confirm your spot once the fee is paid.'],
               ['03', 'Play', 'Get your team, play the bracket, and see the results posted publicly.']]
               .map(([n, h, p]) => <article className="card" data-build key={n}><p className="mono amber">{n}</p><h3>{h}</h3><p>{p}</p></article>)}
           </div>
@@ -158,7 +158,7 @@ export default function Home() {
                 <EventDate date={info?.event_date} />
                 <span className="event-main">
                   <span className="event-title display">{name}</span>
-                  <span className="event-meta mono muted">VALORANT · PLAYER AUCTION · {info?.teams ?? 10} TEAMS · ₹{info?.fee ?? 300} ENTRY</span>
+                  <span className="event-meta mono muted">VALORANT · AUCTION DAY · {info?.teams ?? 10} TEAMS · ₹{info?.fee ?? 300} ENTRY</span>
                 </span>
                 <span className="event-status">
                   <span className={'tag' + (open === false ? ' ghost' : '')}>{open === false ? 'SIGN-UPS CLOSED' : 'SIGN-UPS OPEN'}</span>

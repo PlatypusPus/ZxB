@@ -24,8 +24,8 @@ export async function api(path, { method = 'GET', body, form, token, leader } = 
 }
 
 export const STATUS_TEXT = {
-  submitted: ['Payment submitted', 'We have your sign-up. An organiser will check your UTR against the bank statement, usually within 24 hours.'],
-  verified: ['Payment verified', 'Your ₹300 is confirmed. Next we check your rank on tracker.gg.'],
+  submitted: ['Signed up', 'We have your sign-up. The entry fee is collected later to confirm your spot; we’ll email you how and when to pay.'],
+  verified: ['Fee paid', 'Your entry fee is confirmed. Next we check your rank on tracker.gg.'],
   approved: ['Approved', "You're in. Captains get their team link on WhatsApp; players enter the auction pool."],
   rejected: ['Rejected', 'See the reason below. Message the organisers if you think this is a mistake.'],
   waitlisted: ['Waitlisted', 'All captain slots are taken. You can switch to auction player, or wait in case a captain drops out.'],

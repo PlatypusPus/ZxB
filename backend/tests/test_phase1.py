@@ -80,11 +80,14 @@ async def test_peak_below_current(c):  # TC-03
     assert r.status_code == 422 and "peak_rank" in r.json()["detail"]["errors"]
 
 
-async def test_duplicate_utr(c):  # TC-04
-    assert (await signup(c, utr="123456789012")).status_code == 201
-    r = await signup(c, utr="1234 5678 9012")
-    assert r.status_code == 409 and "utr" in r.json()["detail"]["errors"]
-    assert len(await queue(c)) == 1
+async def test_fee_is_due_until_marked_paid(c):  # the fee is collected after sign-up
+    assert (await signup(c)).status_code == 201
+    assert (await signup(c)).status_code == 201   # no UTR at sign-up, so nothing to clash
+    row = next(iter((await queue(c)).values()))
+    assert row["status"] == "submitted" and row["payment"]["status"] == "due" and row["payment"]["screenshot"] == ""
+    assert (await c.post(f"/api/v1/admin/players/{row['id']}/approve", headers=c.admin)).status_code == 409
+    r = await c.post(f"/api/v1/admin/payments/{row['payment']['id']}/verify", headers=c.admin)
+    assert r.json() == {"payment_status": "verified", "status": "verified"}
 
 
 async def test_terms_required(c):  # TC-05
@@ -158,7 +161,7 @@ async def test_bad_uploads_refused(c):  # TC-12
     for bad in [("pay.png", b"MZ\x90\x00 not an image", "image/png"),
                 ("pay.svg", b'<svg xmlns="http://www.w3.org/2000/svg"/>', "image/svg+xml"),
                 ("pay.png", b"\x89PNG" + b"0" * (2 * 1024 * 1024), "image/png")]:
-        r = await signup(c, files={"screenshot": bad})
+        r = await signup(c, files={"photo": bad})
         assert r.status_code in (413, 422), r.text
     assert len(await queue(c)) == 0 and not uploads()
 
@@ -169,12 +172,12 @@ async def test_exif_stripped(c):  # TC-13
     ex.get_ifd(0x8825)[2] = (12.0, 58.0, 1.0)
     jpg = img("JPEG", size=(300, 200), exif=ex)
     assert Image.open(io.BytesIO(jpg)).getexif()
-    r = await signup(c, files={"screenshot": ("pay.jpg", jpg, "image/jpeg"), "photo": ("me.jpg", jpg, "image/jpeg")})
+    r = await signup(c, files={"photo": ("me.jpg", jpg, "image/jpeg")})
     assert r.status_code == 201
     for f in uploads():
         im = Image.open(f)
         assert im.format == "WEBP" and not im.getexif() and "exif" not in im.info
-    assert {f.parent.name for f in uploads()} == {"private", "public"}
+    assert {f.parent.name for f in uploads()} == {"public"}
 
 
 async def test_admin_auth_and_privacy(c):  # TC-31, TC-33
@@ -187,10 +190,8 @@ async def test_admin_auth_and_privacy(c):  # TC-31, TC-33
     assert (await c.get("/api/v1/admin/queue", headers=forged)).status_code == 401
     public = "".join([(await c.get(u)).text for u in ("/api/v1/teams", "/api/v1/players", "/api/v1/public")])
     assert "Player" in public  # the leader card is there...
-    for secret in ("9876543210", row["payment"]["utr"], row["payment"]["screenshot"], row["discord"]):
+    for secret in ("9876543210", row["discord"]):
         assert secret not in public  # ...but none of the private data
-    shot = await c.get(f"/api/v1/admin/files/{row['payment']['screenshot']}", headers=c.admin)
-    assert shot.status_code == 200 and (await c.get(f"/media/{row['payment']['screenshot']}")).status_code == 404
 
 
 async def test_signup_rate_limit(c):  # TC-34
@@ -323,3 +324,18 @@ async def test_admin_delete_removes_signup_completely(c):
         assert not (await db.scalars(select(Team).where(Team.leader_player_id == pid))).first()
     assert (await c.post(f"/api/v1/admin/players/{pid}/delete", headers=c.admin)).status_code == 404
     assert (await c.post(f"/api/v1/admin/players/{pid}/delete")).status_code == 401
+
+
+async def test_rejected_captain_becomes_auction_player(c):
+    from sqlalchemy import select
+    from app.core import Session
+    from app.models import Team
+    await signup(c, path="leader")
+    row = next(iter((await queue(c)).values()))
+    r = (await c.post(f"/api/v1/admin/players/{row['id']}/reject", json={"reason": "Too many captains"}, headers=c.admin)).json()
+    assert r["path"] == "auction" and r["status"] == "submitted"
+    async with Session() as db:
+        assert not (await db.scalars(select(Team).where(Team.leader_player_id == row["id"]))).first()
+    # Rejecting again, now as a player, rejects for real.
+    r = (await c.post(f"/api/v1/admin/players/{row['id']}/reject", json={"reason": "Rank mismatch"}, headers=c.admin)).json()
+    assert r["status"] == "rejected"

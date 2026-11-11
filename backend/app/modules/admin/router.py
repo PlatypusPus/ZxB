@@ -77,7 +77,7 @@ async def pay_of(db: AsyncSession, payment_id: int):
 @router.post("/payments/{payment_id}/verify")
 async def verify_payment(payment_id: int, db: AsyncSession = Depends(get_db), admin: str = Depends(require_admin)):
     p, pay = await pay_of(db, payment_id)
-    if pay.status != "submitted":
+    if pay.status not in ("submitted", "due"):
         raise HTTPException(409, f"Payment is already {pay.status}")
     pay.status, pay.verified_by, pay.verified_at = "verified", admin, utcnow()
     if p.status == "submitted":
@@ -173,7 +173,20 @@ async def reject_player(player_id: int, body: dict, db: AsyncSession = Depends(g
     reason = str(body.get("reason", "")).strip()
     if not reason:
         raise HTTPException(422, "Give a reason; the player will see it")
-    p, _ = await player_and_payment(db, player_id)
+    p, pay = await player_and_payment(db, player_id)
+    if p.path == "leader" and p.status not in ("rejected", "withdrawn"):
+        # A captain who isn't accepted stays in the event as an auction player.
+        t, _ = await load(db)
+        if t.locked_at:
+            raise HTTPException(409, "The auction has started")
+        await db.execute(delete(Team).where(Team.leader_player_id == p.id))
+        p.path, p.status = "auction", "verified" if pay.status == "verified" else "submitted"
+        audit(db, admin, "player.captain_rejected", player_id=p.id, reason=reason)
+        await db.commit()
+        emailed = await notify(p, t.name, "you weren't selected as a captain",
+                               f"You weren't selected as a captain.\n\nReason: {reason}\n\nYou're still in: you've been moved "
+                               "into the auction player pool, and captains will bid for you live on auction day.")
+        return {"status": p.status, "path": p.path, "emailed": emailed}
     p.status, p.reject_reason = "rejected", reason
     audit(db, admin, "player.rejected", player_id=p.id, reason=reason)
     await db.commit()

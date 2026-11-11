@@ -23,7 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..core import SECRET_KEY, check_password, get_db, hash_password, mail_html, rate_limit, send_mail, utcnow
+from ..core import SECRET_KEY, check_password, get_db, hash_password, mail_html, rate_limit, rate_limit_key, send_mail, utcnow
 from ..models import Account
 from ..tournament import load
 
@@ -128,6 +128,7 @@ def _set_identity(resp, value: str):
 
 @router.get("/auth/{provider}/start")
 async def start(provider: str, request: Request):
+    rate_limit(request, "oauth", 30, 600)
     if provider == "dev" and "dev" in enabled():
         n = secrets.token_hex(3)
         return _set_identity(_back(request), issue_identity("dev", n, f"Dev {n}", email=f"dev{n}@example.com"))
@@ -145,6 +146,7 @@ async def start(provider: str, request: Request):
 
 @router.get("/auth/{provider}/callback")
 async def callback(provider: str, request: Request, code: str = "", state: str = "", error: str = ""):
+    rate_limit(request, "oauth-back", 30, 600)
     saved = _unsign("state", request.cookies.get(STATE_COOKIE, ""))
     if error:
         return _back(request, "Sign-in was cancelled")
@@ -242,7 +244,10 @@ def _deliver(to: str, subject: str, text: str, html_body: str, link: str) -> Non
 
 
 async def send_verification(db: AsyncSession, acct: Account, tasks: BackgroundTasks) -> None:
-    """Queues the email to go out after the response, so the page doesn't wait on the mail server (2-5 s)."""
+    """Queues the email to go out after the response, so the page doesn't wait on the mail server (2-5 s).
+    Per account: one email a minute, five an hour (the page shows a matching countdown)."""
+    rate_limit_key(f"verify-mail:{acct.id}", 1, 60)
+    rate_limit_key(f"verify-mail-hour:{acct.id}", 5, 3600)
     t, _ = await load(db)
     link = f"{PUBLIC_URL}/api/v1/auth/verify?t={_sign('verify', {'a': acct.id, 'e': acct.email}, VERIFY_HOURS)}"
     lines = [f"Hi {acct.name},", f"Confirm this is your email to finish signing up for {t.name}. "
@@ -253,7 +258,8 @@ async def send_verification(db: AsyncSession, acct: Account, tasks: BackgroundTa
 
 
 @router.get("/auth/verify")
-async def verify(t: str = "", db: AsyncSession = Depends(get_db)):
+async def verify(request: Request, t: str = "", db: AsyncSession = Depends(get_db)):
+    rate_limit(request, "verify", 30, 600)
     data = _unsign("verify", t)
     acct = data and await db.get(Account, data.get("a"))
     if not acct or acct.email != data.get("e"):
@@ -268,7 +274,7 @@ async def verify(t: str = "", db: AsyncSession = Depends(get_db)):
 @router.post("/auth/resend")
 async def resend(request: Request, tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     who = require_identity(request)
-    rate_limit(request, "resend", 3, 600)
+    rate_limit(request, "resend", 20, 600)   # per IP; loose, since a college or mobile network shares one IP
     acct = who["provider"] == "email" and await db.get(Account, int(who["sub"]))
     if not acct or acct.verified_at:
         return {"emailed": False, "verified": True}

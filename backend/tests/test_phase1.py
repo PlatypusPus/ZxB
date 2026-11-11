@@ -339,3 +339,23 @@ async def test_rejected_captain_becomes_auction_player(c):
     # Rejecting again, now as a player, rejects for real.
     r = (await c.post(f"/api/v1/admin/players/{row['id']}/reject", json={"reason": "Rank mismatch"}, headers=c.admin)).json()
     assert r["status"] == "rejected"
+
+
+async def test_resend_waits_a_minute(c, monkeypatch):
+    from app.modules import auth as auth_mod
+    monkeypatch.setattr(auth_mod, "send_mail", lambda *a, **k: True)
+    r = await c.post("/api/v1/auth/register", json={"name": "Slow Poke", "email": "slow@example.com", "password": "hunter2hunter2"})
+    me = {"cookie": "zxb_id=" + r.cookies["zxb_id"]}
+    assert (await c.post("/api/v1/auth/resend", headers=me)).status_code == 429   # the sign-up email was just sent
+
+
+async def test_rate_limits_wrong_captain_codes_and_api_floods(c, monkeypatch):
+    bad = {"Authorization": "Leader not-a-real-code"}
+    codes = [(await c.get("/api/v1/leader/me", headers=bad)).status_code for _ in range(21)]
+    assert codes[:20] == [401] * 20 and codes[20] == 429
+    from app import main
+    monkeypatch.setattr(main, "API_PER_MINUTE", 5)
+    core._hits.clear()
+    codes = [(await c.get("/api/v1/public")).status_code for _ in range(6)]
+    assert codes[:5] == [200] * 5 and codes[5] == 429
+    assert (await c.get("/api/v1/health")).status_code == 200   # never limited, for the uptime check

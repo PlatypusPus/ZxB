@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...core import PUBLIC_DIR, Session, audit, get_db, image_name, process_image, require_admin, sha256
+from ...core import PUBLIC_DIR, Session, audit, get_db, image_name, process_image, rate_limit_key, require_admin, sha256
 from ...models import Team
 from ...tournament import TAG, load, settings
 from ..realtime import hub
@@ -33,10 +33,17 @@ async def get_snapshot(db: AsyncSession = Depends(get_db)):
     return await service.snapshot(db)
 
 
+WS_PER_IP = 100   # a whole room on one WiFi still fits
+
+
 @router.websocket("/ws")
 async def ws(socket: WebSocket):
     if ALLOWED_ORIGINS and socket.headers.get("origin") not in ALLOWED_ORIGINS:
         await socket.close(code=4403)
+        return
+    ip = socket.client.host if socket.client else "?"
+    if sum(1 for s in hub.clients if s.client and s.client.host == ip) >= WS_PER_IP:
+        await socket.close(code=4429)   # too many live screens from one IP
         return
     await socket.accept()
     hub.clients.add(socket)
@@ -91,10 +98,12 @@ async def proxy_bid(body: dict, db: AsyncSession = Depends(get_db), admin: str =
 
 # ---------- leaders
 
-async def leader_team(authorization: str = Header(""), db: AsyncSession = Depends(get_db)) -> Team:
+async def leader_team(request: Request, authorization: str = Header(""), db: AsyncSession = Depends(get_db)) -> Team:
     code = authorization.removeprefix("Leader ").strip()
     team = code and await db.scalar(select(Team).where(Team.access_code_hash == sha256(code)))
     if not team:
+        # Only wrong codes count, so captains with a real link are never slowed down.
+        rate_limit_key(f"leader-bad:{request.client.host if request.client else '?'}", 20, 600)
         raise HTTPException(401, "This captain link is invalid or was replaced. Ask the organisers for a new one.")
     return team
 

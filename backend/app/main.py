@@ -5,11 +5,11 @@ import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from .core import MAX_BODY, PUBLIC_DIR, Session, hash_password
+from .core import MAX_BODY, PUBLIC_DIR, Session, hash_password, rate_limit
 from .modules.admin.router import router as admin_router
 from .modules.auction import service as auction
 from .modules.auction.router import router as auction_router, timer_loop
@@ -29,6 +29,20 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="ZenithXBeans Tournament API", lifespan=lifespan, docs_url=None, redoc_url=None)
+
+
+API_PER_MINUTE = 600   # per IP, all /api/ calls together
+
+
+@app.middleware("http")
+async def api_rate_limit(request: Request, call_next):
+    path = request.url.path
+    if path.startswith("/api/") and path != "/api/v1/health":
+        try:
+            rate_limit(request, "api", API_PER_MINUTE, 60)
+        except HTTPException as e:
+            return JSONResponse({"detail": e.detail}, status_code=429, headers={"Retry-After": "60"})
+    return await call_next(request)
 
 
 @app.middleware("http")

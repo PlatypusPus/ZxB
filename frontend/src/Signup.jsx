@@ -285,10 +285,14 @@ export function SignIn({ providers, error, info, path, onDone, heading = 'Sign i
 // Email accounts must click the link we send before they can register.
 export function CheckEmail({ user, info, onSignOut, onCheck }) {
   const [msg, setMsg] = useState(''), [busy, setBusy] = useState(false)
-  useEffect(() => {   // coming back from the mail app: check again without a tap
-    const back = () => document.visibilityState === 'visible' && onCheck()
+  const [wait, setWait] = useState(60)   // seconds until 'Send again' unlocks; the server allows one a minute
+  useEffect(() => { if (wait > 0) { const t = setTimeout(() => setWait(wait - 1), 1000); return () => clearTimeout(t) } }, [wait])
+  useEffect(() => {   // no button to press: check when they come back from the mail app, and every few seconds
+    const back = () => document.visibilityState === 'visible' &&
+      api('/auth/me').then(a => a.user?.verified && onCheck(), () => {})   // a dropped request just waits for the next try
     document.addEventListener('visibilitychange', back)
-    return () => document.removeEventListener('visibilitychange', back)
+    const tick = setInterval(back, 5000)
+    return () => { document.removeEventListener('visibilitychange', back); clearInterval(tick) }
   }, [])
   const resend = async () => {
     setBusy(true); setMsg('')
@@ -296,19 +300,19 @@ export function CheckEmail({ user, info, onSignOut, onCheck }) {
       const r = await api('/auth/resend', { method: 'POST' })
       if (r.verified) return onCheck()
       setMsg('Sent again. It can take a minute; check Spam and Promotions too.')
-    } catch (e) { setMsg(e.message) } finally { setBusy(false) }
+      setWait(60)
+    } catch (e) { setMsg(e.status === 429 ? 'You’ve asked for a few links already. Wait a bit, then try again.' : e.message); if (e.status === 429) setWait(60) } finally { setBusy(false) }
   }
   return (
     <main className="wrap narrow signin">
       <a href="/" className="btn ghost">← {info?.name || 'Home'}</a>
       <h1 className="display">Check your email</h1>
-      <p className="lede">We sent a link to <strong>{user.email}</strong>. Open it to verify your email, then you can finish signing up.</p>
+      <p className="lede">We sent a link to <strong>{user.email}</strong>. Open it to verify your email. This page moves on by itself once you have.</p>
       <p className="follow-warn" role="note"><strong>Not in your inbox? Check your Spam and Promotions folders.</strong> The email is from ZenithXBeans and can take a minute to arrive. If it’s in Spam, tap “Not spam” so our next emails reach you.</p>
       <p className="muted">Typo in the email? Use a different email below, or sign in with Google instead.</p>
       {msg && <p role="status">{msg}</p>}
       <div className="actions">
-        <button type="button" className="btn" onClick={onCheck}>I’ve verified, continue</button>
-        <button type="button" className="btn ghost" disabled={busy} onClick={resend}>Send the link again</button>
+        <button type="button" className="btn" disabled={busy || wait > 0} onClick={resend}>{wait > 0 ? `Send again in 0:${String(wait).padStart(2, '0')}` : 'Send the link again'}</button>
         <button type="button" className="btn ghost" onClick={onSignOut}>Use a different email</button>
       </div>
     </main>

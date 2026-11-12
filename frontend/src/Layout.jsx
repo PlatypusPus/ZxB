@@ -64,8 +64,17 @@ export function Count({ value, prefix = '' }) {
 
 // Leader slots as tiles: red = taken, outlined = still open.
 // ponytail: fixed schedule for this event; move into settings when there is a second tournament.
+// "15 Nov 2026" -> { day: '15', mon: 'NOV', weekday: 'Sunday', date }, or null if it can't be read.
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+export function parseDay(text) {
+  const [d, m, y] = (text || '').split(' '), mi = MONTHS.indexOf((m || '').slice(0, 3).toLowerCase())
+  if (!/^\d{1,2}$/.test(d || '') || mi < 0 || !/^\d{4}$/.test(y || '')) return null
+  const date = new Date(+y, mi, +d)
+  return { day: d, mon: MONTHS[mi].toUpperCase(), weekday: date.toLocaleDateString('en-GB', { weekday: 'long' }), date }
+}
+
 const SCHEDULE = [
-  ['13', 'Fri', 'Auction', 'Captains bid on registered players. Unsold players go again at half price.', ''],
+  ['', '', 'Auction', 'Captains bid on registered players. Unsold players go again at half price.', ''],
   ['TBA', '', 'Group stage', '10 teams in 2 groups of 5, single round robin. Both groups play 2 matches a day; each team plays 4 and has one bye day.', 'BO1'],
   ['TBA', '', 'Buffer day', 'Kept free for reschedules.', ''],
   ['TBA', '', 'Upper bracket round 1', 'Top 3 from each group qualify.', 'BO3'],
@@ -76,13 +85,17 @@ const SCHEDULE = [
 ]
 const SEEDS = ['Group A winner', 'Group B winner', 'Group A runner-up', 'Group B runner-up', 'Group A 3rd', 'Group B 3rd']
 
-export function Schedule() {
+export function Schedule({ date }) {
+  const a = parseDay(date)   // the auction row follows the date in Admin -> Settings
+  const rows = SCHEDULE.map(([d, day, ...rest], i) => i === 0
+    ? [a?.day || 'TBA', a ? `${a.mon} · ${a.weekday.slice(0, 3).toUpperCase()}` : 'DATE', ...rest]
+    : [d, day ? `NOV · ${day.toUpperCase()}` : 'DATE', ...rest])
   return (
     <div className="schedule">
       <ol className="sched" aria-label="Schedule">
-        {SCHEDULE.map(([d, day, h, p, fmt]) => (
+        {rows.map(([d, label, h, p, fmt]) => (
           <li key={h} data-build>
-            <span className="sched-date"><b className="digits">{d}</b><span className="mono muted">{day ? `NOV · ${day.toUpperCase()}` : 'DATE'}</span></span>
+            <span className="sched-date"><b className="digits">{d}</b><span className="mono muted">{label}</span></span>
             <span><strong>{h}</strong>{p && <span className="muted"> {p}</span>}</span>
             {fmt && <span className="tag ghost">{fmt}</span>}
           </li>

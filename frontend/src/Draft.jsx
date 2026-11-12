@@ -147,7 +147,7 @@ export default function Draft() {
 
         <section className="wrap" data-section>
           <h2 className="display" data-decode>Schedule</h2>
-          <Schedule />
+          <Schedule date={info?.event_date} />
         </section>
 
         {teams.length > 0 && (

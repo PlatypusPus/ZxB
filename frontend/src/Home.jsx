@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from './api.js'
-import { Footer, Nav, Schedule, SlotMeter, Ticker } from './Layout.jsx'
+import { Footer, Nav, Schedule, SlotMeter, Ticker, parseDay } from './Layout.jsx'
 
 const FAQ = [
   ['What is ZenithXBeans?', 'A community that runs Valorant tournaments for players, by players.'],
@@ -11,20 +11,19 @@ const FAQ = [
   ['How do I hear about the next tournament?', 'New events are announced first on Instagram (@shankssays, @whoshanks, @ttvpeachysmolbean), Twitch (peachysmolbean) and YouTube (@ShanksSays, @peachysmolbeanlive), then listed here.'],
 ]
 
-// "13 Nov 2026" -> a big day number over the month. Anything else shows TBA.
+// "15 Nov 2026" -> a big day number over the month. Anything else shows TBA.
 function EventDate({ date }) {
   const [d, m] = (date || '').split(' ')
   const ok = /^\d{1,2}$/.test(d || '')
   return <span className="event-when"><b className="digits">{ok ? d : 'TBA'}</b><span className="mono">{ok ? m?.toUpperCase() : 'DATE'}</span></span>
 }
 
-// Whole days from today until an event date like "11 Nov 2026"; null if it can't be read.
-const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+// Whole days from today until the auction; null if the date can't be read.
 function daysUntil(date) {
-  const [d, m, y] = (date || '').split(' '), mi = MONTHS.indexOf((m || '').slice(0, 3).toLowerCase())
-  if (!/^\d{1,2}$/.test(d || '') || mi < 0 || !/^\d{4}$/.test(y || '')) return null
+  const a = parseDay(date)
+  if (!a) return null
   const today = new Date(); today.setHours(0, 0, 0, 0)
-  return Math.round((new Date(+y, mi, +d) - today) / 864e5)
+  return Math.round((a.date - today) / 864e5)
 }
 
 // Rank groups and their starting credits, highest first. The organiser sets the numbers in Admin -> Settings.
@@ -49,7 +48,7 @@ export default function Home() {
   useEffect(() => { api('/public').then(setInfo).catch(() => {}) }, [])
   const open = info?.registration_open
   const name = info?.name || 'ZenithXBeans Valorant Auction'
-  const days = daysUntil(info?.event_date)
+  const days = daysUntil(info?.event_date), auction = parseDay(info?.event_date)
 
   return (
     <>
@@ -64,7 +63,7 @@ export default function Home() {
           <div className="hero-deck">
             <div className="hero-pitch">
               <h2 className="display">Valorant <span className="pink">Auction</span></h2>
-              <p>{info?.teams ?? 10} captains, {info?.credits_per_team ?? 1000} credits each. Every player goes under the hammer live, on Friday 13 November, then the teams fight it out. Tournament dates TBA.</p>
+              <p>{info?.teams ?? 10} captains, {info?.credits_per_team ?? 1000} credits each. Every player goes under the hammer live{auction ? `, on ${auction.weekday} ${auction.day} ${auction.mon[0] + auction.mon.slice(1).toLowerCase()}` : ''}, then the teams fight it out. Tournament dates TBA.</p>
               {open !== false && <div className="actions">
                 <a className="btn" href="/signup?path=leader">Be a captain</a>
                 <a className="btn ghost" href="/signup?path=auction">Get auctioned</a>
@@ -77,7 +76,7 @@ export default function Home() {
                 <span className="mono">{days === 0 ? 'AUCTION IS TODAY' : `${days === 1 ? 'DAY' : 'DAYS'} TO THE AUCTION`}</span>
               </p>}
               <ol className="hero-dates">
-                <li><b className="digits">13</b><span className="mono muted">NOV · FRI</span><span>Auction</span></li>
+                <li><b className="digits">{auction?.day || 'TBA'}</b><span className="mono muted">{auction ? `${auction.mon} · ${auction.weekday.slice(0, 3).toUpperCase()}` : 'DATE'}</span><span>Auction</span></li>
                 <li><b className="digits">TBA</b><span className="mono muted">DATES</span><span>Group stage</span></li>
                 <li><b className="digits">TBA</b><span className="mono muted">DATES</span><span>Grand final</span></li>
               </ol>
@@ -128,7 +127,7 @@ export default function Home() {
             <dl className="auction-facts">
               <div><dt className="mono muted">ENTRY</dt><dd>₹{info?.fee ?? 300}</dd></div>
               <div><dt className="mono muted">TEAMS</dt><dd>{info?.teams ?? 10}</dd></div>
-              <div><dt className="mono muted">AUCTION</dt><dd>Fri {info?.event_date?.replace(/ \d{4}$/, '') || 'TBA'}</dd></div>
+              <div><dt className="mono muted">AUCTION</dt><dd>{auction ? `${auction.weekday.slice(0, 3)} ${auction.day} ${auction.mon}` : 'TBA'}</dd></div>
               <div><dt className="mono muted">TOURNAMENT</dt><dd>TBA</dd></div>
             </dl>
             <div className="actions"><a className="btn ghost" href="/draft">Full format and rules</a><a className="btn ghost" href="/refund-policy">Refund policy</a></div>
@@ -137,7 +136,7 @@ export default function Home() {
 
         <section className="wrap" id="schedule" data-section>
           <h2 className="display" data-decode>Schedule</h2>
-          <Schedule />
+          <Schedule date={info?.event_date} />
         </section>
 
         <section className="wrap" data-section>

@@ -174,7 +174,7 @@ function Teams({ call }) {
 const STATUS = { draft: 'Draft (hidden)', registration_open: 'Open for sign-ups', registration_closed: 'Closed' }
 const SECTIONS = [
   { title: 'Event', note: 'What players see on the site.', fields: [
-    { k: 'event_date', label: 'Auction date', kind: 'text', hint: 'Shown on the site, e.g. 13 Nov 2026' },
+    { k: 'event_date', label: 'Auction date', kind: 'text', hint: 'Shown on the site, e.g. 15 Nov 2026' },
     { k: 'registration_opens_at', label: 'Registration opens', kind: 'time', hint: 'Optional, India time' },
     { k: 'registration_closes_at', label: 'Registration closes', kind: 'time', hint: 'Optional, India time' },
   ] },

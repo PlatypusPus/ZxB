@@ -136,7 +136,7 @@ export default function Home() {
 
         <section className="wrap" id="schedule" data-section>
           <h2 className="display" data-decode>Schedule</h2>
-          <Schedule date={info?.event_date} />
+          <Schedule date={info?.event_date} teams={info?.teams} />
         </section>
 
         <section className="wrap" data-section>

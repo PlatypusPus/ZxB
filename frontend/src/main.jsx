@@ -29,8 +29,8 @@ const page = path === '/draft' || path === '/auction' ? <Draft />
 // Per-page title, description and canonical URL. Private pages (links with secrets, admin) stay out of search.
 const SITE = 'https://zxb.shov.in'
 const META = {
-  '/': ['ZenithXBeans · Community Valorant Tournaments', 'Community Valorant tournaments hosted by ZenithXBeans. The Valorant Auction: captains bid for players live, 10 teams, ₹300 entry.'],
-  '/draft': ['Valorant Auction · ZenithXBeans', 'Sign up as a captain, get auctioned as a player, or join the free sub pool. Auction on Sunday 15 Nov 2026; tournament dates TBA.'],
+  '/': ['ZenithXBeans · Community Valorant Tournaments', 'Community Valorant tournaments hosted by ZenithXBeans. The Valorant Auction: captains bid for players live.'],
+  '/draft': ['Valorant Auction · ZenithXBeans', 'Sign up as a captain, get auctioned as a player, or join the free sub pool. See the auction date, format and rules.'],
   '/signup': ['Sign up · ZenithXBeans Valorant Auction', 'Register for the ZenithXBeans Valorant Auction as a captain, auction player or sub.'],
   '/refund-policy': ['Refund policy · ZenithXBeans', 'Entry fees are not refunded, but you can swap your place with another player.'],
   '/privacy': ['Privacy · ZenithXBeans', 'What ZenithXBeans collects when you register, and who can see it.'],

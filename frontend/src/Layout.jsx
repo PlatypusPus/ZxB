@@ -75,7 +75,7 @@ export function parseDay(text) {
 
 const SCHEDULE = [
   ['', '', 'Auction', 'Captains bid on registered players. Unsold players go again at half price.', ''],
-  ['TBA', '', 'Group stage', '10 teams in 2 groups of 5, single round robin. Both groups play 2 matches a day; each team plays 4 and has one bye day.', 'BO1'],
+  ['TBA', '', 'Group stage', 'Teams split into 2 groups, single round robin.', 'BO1'],
   ['TBA', '', 'Buffer day', 'Kept free for reschedules.', ''],
   ['TBA', '', 'Upper bracket round 1', 'Top 3 from each group qualify.', 'BO3'],
   ['TBA', '', 'Lower bracket round 1', '', 'BO3'],
@@ -85,11 +85,12 @@ const SCHEDULE = [
 ]
 const SEEDS = ['Group A winner', 'Group B winner', 'Group A runner-up', 'Group B runner-up', 'Group A 3rd', 'Group B 3rd']
 
-export function Schedule({ date }) {
+export function Schedule({ date, teams }) {
   const a = parseDay(date)   // the auction row follows the date in Admin -> Settings
   const rows = SCHEDULE.map(([d, day, ...rest], i) => i === 0
     ? [a?.day || 'TBA', a ? `${a.mon} · ${a.weekday.slice(0, 3).toUpperCase()}` : 'DATE', ...rest]
-    : [d, day ? `NOV · ${day.toUpperCase()}` : 'DATE', ...rest])
+    : [d, 'DATE', ...rest])
+  if (teams) rows[1][3] = `${teams} teams split into 2 groups, single round robin.`
   return (
     <div className="schedule">
       <ol className="sched" aria-label="Schedule">

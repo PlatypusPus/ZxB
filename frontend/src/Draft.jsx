@@ -5,7 +5,7 @@ import { Stamp, TimerTiles } from './Projector.jsx'
 import { Count, Footer, Nav, Schedule, SlotMeter, Ticker } from './Layout.jsx'
 
 const FAQ = [
-  ['Who can sign up?', 'Anyone who plays Valorant. Pick captain or auction player and sign up for free today; the ₹300 entry fee is collected later to confirm your spot. The sub pool is free.'],
+  ['Who can sign up?', 'Anyone who plays Valorant. Pick captain or auction player and sign up for free today; the entry fee is collected later to confirm your spot. The sub pool is free.'],
   ['When do I pay?', 'Not at sign-up. The entry fee is collected later to confirm your spot, and we email everyone how and when to pay. The whole prize pool is made up of entry fees.'],
   ['What if I’m not picked as a captain?', 'You stay in: your sign-up moves into the auction player pool and captains bid for you on auction day.'],
   ['How is my rank checked?', 'We open your Riot ID on tracker.gg. If your current or peak rank does not match, your sign-up is rejected with the reason.'],
@@ -147,7 +147,7 @@ export default function Draft() {
 
         <section className="wrap" data-section>
           <h2 className="display" data-decode>Schedule</h2>
-          <Schedule date={info?.event_date} />
+          <Schedule date={info?.event_date} teams={info?.teams} />
         </section>
 
         {teams.length > 0 && (

@@ -10,7 +10,7 @@ from ...core import (PRIVATE_DIR, PUBLIC_DIR, audit, get_db, image_name, new_tok
                      publish, rate_limit, sha256, utcnow)
 from ...models import Payment, Player, Sale, Team
 from ..auth import require_identity, is_verified
-from ...tournament import (TERMS_VERSION, approved_leaders, load, public_card, registration_open,
+from ...tournament import (TERMS_VERSION, approved_leaders, load, public_card, registration_open, settings,
                            validate_profile, validate_team)
 
 router = APIRouter()
@@ -34,10 +34,11 @@ def unique_error(e: IntegrityError) -> HTTPException:
 @router.get("/public")
 async def public_info(db: AsyncSession = Depends(get_db)):
     t, cfg = await load(db)
-    s = t.settings
+    s, sd = t.settings, settings(t)   # sd includes defaults for keys added after the event was created
     signups = await db.scalar(select(func.count()).where(Player.status.not_in(["rejected", "withdrawn"])))
     return {"name": t.name, "host": t.host, "status": t.status, "registration_open": registration_open(t),
-            "event_date": s["event_date"], "fee": s["fee"], "upi_id": s["upi_id"], "upi_name": s["upi_name"],
+            "event_date": s["event_date"], "group_start": sd["group_start"], "group_end": sd["group_end"],
+            "playoffs_start": sd["playoffs_start"], "fee": s["fee"], "upi_id": s["upi_id"], "upi_name": s["upi_name"],
             "upi_qr_url": s.get("upi_qr") and f"/media/{s['upi_qr']}",
             "signups": signups, "leader_slots_left": max(0, s["teams"] - await approved_leaders(db)),
             "teams": s["teams"], "credits_per_team": s["credits_per_team"], "min_players": s["min_players"],

@@ -73,24 +73,29 @@ export function parseDay(text) {
   return { day: d, mon: MONTHS[mi].toUpperCase(), weekday: date.toLocaleDateString('en-GB', { weekday: 'long' }), date }
 }
 
-const SCHEDULE = [
-  ['', '', 'Auction', 'Captains bid on registered players. Unsold players go again at half price.', ''],
-  ['TBA', '', 'Group stage', 'Teams split into 2 groups, single round robin.', 'BO1'],
-  ['TBA', '', 'Buffer day', 'Kept free for reschedules.', ''],
-  ['TBA', '', 'Upper bracket round 1', 'Top 3 from each group qualify.', 'BO3'],
-  ['TBA', '', 'Lower bracket round 1', '', 'BO3'],
-  ['TBA', '', 'Upper semifinals + lower round 2', 'Seeds 1 and 2 join here.', 'BO3'],
-  ['TBA', '', 'Upper final + lower final', '', 'BO3'],
-  ['TBA', '', 'Grand final', '', 'BO5'],
-]
+// Date cell for a "15 Nov 2026" setting: big day number plus "NOV · SUN", or TBA.
+export const dayCell = a => a ? [a.day, `${a.mon} · ${a.weekday.slice(0, 3).toUpperCase()}`] : ['TBA', 'DATE']
+// A span of two settings: "15–21" over "NOV" (or "15 NOV–2 DEC" style when months differ).
+export function spanCell(from, to) {
+  if (!from || !to) return dayCell(from || to)
+  return from.mon === to.mon ? [`${from.day}–${to.day}`, from.mon] : [`${from.day}–${to.day}`, `${from.mon}–${to.mon}`]
+}
 const SEEDS = ['Group A winner', 'Group B winner', 'Group A runner-up', 'Group B runner-up', 'Group A 3rd', 'Group B 3rd']
 
-export function Schedule({ date, teams }) {
-  const a = parseDay(date)   // the auction row follows the date in Admin -> Settings
-  const rows = SCHEDULE.map(([d, day, ...rest], i) => i === 0
-    ? [a?.day || 'TBA', a ? `${a.mon} · ${a.weekday.slice(0, 3).toUpperCase()}` : 'DATE', ...rest]
-    : [d, 'DATE', ...rest])
-  if (teams) rows[1][3] = `${teams} teams split into 2 groups, single round robin.`
+// Every date comes from Admin -> Settings; anything not set shows TBA.
+export function Schedule({ info }) {
+  const auction = parseDay(info?.event_date), g1 = parseDay(info?.group_start), g2 = parseDay(info?.group_end)
+  const po = parseDay(info?.playoffs_start), tba = ['TBA', 'DATE']
+  const rows = [
+    [...dayCell(auction), 'Auction', 'Captains bid on registered players. Unsold players go again at half price.', ''],
+    [...spanCell(g1, g2), 'Group stage', `${info?.teams ? info.teams + ' teams' : 'Teams'} split into 2 groups, single round robin.`, 'BO1'],
+    [...dayCell(g2), 'Playoff scheduling', 'Organisers agree playoff match times with the qualified teams that night.', ''],
+    [...dayCell(po), 'Upper bracket round 1', 'Playoffs begin. Top 3 from each group qualify.', 'BO3'],
+    [...tba, 'Lower bracket round 1', '', 'BO3'],
+    [...tba, 'Upper semifinals + lower round 2', 'Seeds 1 and 2 join here.', 'BO3'],
+    [...tba, 'Upper final + lower final', '', 'BO3'],
+    [...tba, 'Grand final', '', 'BO5'],
+  ]
   return (
     <div className="schedule">
       <ol className="sched" aria-label="Schedule">

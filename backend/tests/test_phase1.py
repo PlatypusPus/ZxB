@@ -359,3 +359,19 @@ async def test_rate_limits_wrong_captain_codes_and_api_floods(c, monkeypatch):
     codes = [(await c.get("/api/v1/public")).status_code for _ in range(6)]
     assert codes[:5] == [200] * 5 and codes[5] == 429
     assert (await c.get("/api/v1/health")).status_code == 200   # never limited, for the uptime check
+
+
+async def test_tournament_dates_stay_editable_after_auction_locks(c):
+    info = (await c.get("/api/v1/public")).json()
+    assert info["group_start"] and info["group_end"] and info["playoffs_start"]   # defaults show without setup
+    from app.core import Session
+    from app.models import Tournament
+    from app.core import utcnow
+    async with Session() as db:
+        t = await db.get(Tournament, 1)
+        t.locked_at = utcnow()
+        await db.commit()
+    put = lambda s: c.put("/api/v1/admin/settings", json={"settings": s}, headers=c.admin)
+    assert (await put({"playoffs_start": "24 Nov 2026"})).status_code == 200
+    assert (await c.get("/api/v1/public")).json()["playoffs_start"] == "24 Nov 2026"
+    assert (await put({"fee": 999})).status_code == 409

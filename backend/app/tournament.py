@@ -18,7 +18,8 @@ VALORANT = {
 }
 DEFAULT_SETTINGS = {
     "fee": 300, "teams": 10, "credits_per_team": 1000, "min_players": 4,
-    "event_date": "15 Nov 2026", "upi_id": "", "upi_name": "ZenithXBeans",
+    "event_date": "15 Nov 2026", "group_start": "15 Nov 2026", "group_end": "21 Nov 2026",
+    "playoffs_start": "23 Nov 2026", "upi_id": "", "upi_name": "ZenithXBeans",
     "registration_opens_at": None, "registration_closes_at": None, "terms_version": "v1",
     # auction (locked once it starts)
     "max_players": None,            # set after registration closes; must fit every approved player

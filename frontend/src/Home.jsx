@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from './api.js'
-import { Footer, Nav, Schedule, SlotMeter, Ticker, parseDay } from './Layout.jsx'
+import { Footer, Nav, Schedule, SlotMeter, Ticker, dayCell, parseDay, spanCell } from './Layout.jsx'
 
 const FAQ = [
   ['What is ZenithXBeans?', 'A community that runs Valorant tournaments for players, by players.'],
@@ -49,6 +49,8 @@ export default function Home() {
   const open = info?.registration_open
   const name = info?.name || 'ZenithXBeans Valorant Auction'
   const days = daysUntil(info?.event_date), auction = parseDay(info?.event_date)
+  const groups = spanCell(parseDay(info?.group_start), parseDay(info?.group_end)), playoffs = parseDay(info?.playoffs_start)
+  const short = a => `${a.weekday.slice(0, 3)} ${a.day} ${a.mon[0] + a.mon.slice(1).toLowerCase()}`
 
   return (
     <>
@@ -63,7 +65,7 @@ export default function Home() {
           <div className="hero-deck">
             <div className="hero-pitch">
               <h2 className="display">Valorant <span className="pink">Auction</span></h2>
-              <p>{info?.teams ?? 10} captains, {info?.credits_per_team ?? 1000} credits each. Every player goes under the hammer live{auction ? `, on ${auction.weekday} ${auction.day} ${auction.mon[0] + auction.mon.slice(1).toLowerCase()}` : ''}, then the teams fight it out. Tournament dates TBA.</p>
+              <p>{info?.teams ?? 10} captains, {info?.credits_per_team ?? 1000} credits each. Every player goes under the hammer live{auction ? `, on ${auction.weekday} ${auction.day} ${auction.mon[0] + auction.mon.slice(1).toLowerCase()}` : ''}, then the teams fight it out{groups[0] !== 'TBA' ? `: group stage ${groups[0]} ${groups[1][0] + groups[1].slice(1).toLowerCase()}` : ''}{playoffs ? `, playoffs from ${short(playoffs)}` : ''}.</p>
               {open !== false && <div className="actions">
                 <a className="btn" href="/signup?path=leader">Be a captain</a>
                 <a className="btn ghost" href="/signup?path=auction">Get auctioned</a>
@@ -77,8 +79,8 @@ export default function Home() {
               </p>}
               <ol className="hero-dates">
                 <li><b className="digits">{auction?.day || 'TBA'}</b><span className="mono muted">{auction ? `${auction.mon} · ${auction.weekday.slice(0, 3).toUpperCase()}` : 'DATE'}</span><span>Auction</span></li>
-                <li><b className="digits">TBA</b><span className="mono muted">DATES</span><span>Group stage</span></li>
-                <li><b className="digits">TBA</b><span className="mono muted">DATES</span><span>Grand final</span></li>
+                <li><b className="digits">{groups[0]}</b><span className="mono muted">{groups[1]}</span><span>Group stage</span></li>
+                <li><b className="digits">{dayCell(playoffs)[0]}</b><span className="mono muted">{playoffs ? `${playoffs.mon} ONWARDS` : 'DATE'}</span><span>Playoffs</span></li>
               </ol>
               <p className="mono"><span className="amber">{info?.leader_slots_left ?? '–'}</span> OF {info?.teams ?? 10} CAPTAIN SLOTS OPEN</p>
             </aside>
@@ -91,7 +93,7 @@ export default function Home() {
           <h2 className="display" data-decode>Featured tournament</h2>
           <article className="card auction-card" data-build>
             <header className="auction-head">
-              <p className="tags"><span className={'tag' + (open === false ? ' ghost' : '')}>{open === false ? 'SIGN-UPS CLOSED' : 'SIGN-UPS OPEN'}</span><span className="tag ghost">VALORANT</span><span className="tag ghost">AUCTION {info?.event_date || 'DATE TBA'}</span><span className="tag ghost">TOURNAMENT DATES TBA</span></p>
+              <p className="tags"><span className={'tag' + (open === false ? ' ghost' : '')}>{open === false ? 'SIGN-UPS CLOSED' : 'SIGN-UPS OPEN'}</span><span className="tag ghost">VALORANT</span><span className="tag ghost">AUCTION {info?.event_date || 'DATE TBA'}</span>{groups[0] !== 'TBA' && <span className="tag ghost">GROUPS {groups[0]} {groups[1]}</span>}</p>
               <h3 className="display">{name}</h3>
               <p className="auction-sub">Captains build their rosters by buying players in a live auction. Everyone who signs up and is approved gets a team.</p>
             </header>
@@ -128,7 +130,7 @@ export default function Home() {
               <div><dt className="mono muted">ENTRY</dt><dd>₹{info?.fee ?? 300}</dd></div>
               <div><dt className="mono muted">TEAMS</dt><dd>{info?.teams ?? 10}</dd></div>
               <div><dt className="mono muted">AUCTION</dt><dd>{auction ? `${auction.weekday.slice(0, 3)} ${auction.day} ${auction.mon}` : 'TBA'}</dd></div>
-              <div><dt className="mono muted">TOURNAMENT</dt><dd>TBA</dd></div>
+              <div><dt className="mono muted">PLAYOFFS</dt><dd>{playoffs ? `From ${short(playoffs)}` : 'TBA'}</dd></div>
             </dl>
             <div className="actions"><a className="btn ghost" href="/draft">Full format and rules</a><a className="btn ghost" href="/refund-policy">Refund policy</a></div>
           </article>
@@ -136,7 +138,7 @@ export default function Home() {
 
         <section className="wrap" id="schedule" data-section>
           <h2 className="display" data-decode>Schedule</h2>
-          <Schedule date={info?.event_date} teams={info?.teams} />
+          <Schedule info={info} />
         </section>
 
         <section className="wrap" data-section>

@@ -104,7 +104,7 @@ export default function Draft() {
           </aside>
         </section>
 
-        <Ticker text={`${name} · auction ${info?.event_date || 'date TBA'} · tournament dates TBA · ₹${info?.fee ?? 300} entry, paid later · `} />
+        <Ticker text={`${name} · auction ${info?.event_date || 'date TBA'} · groups ${info?.group_start && info?.group_end ? `${info.group_start.replace(/ \d{4}$/, '')} to ${info.group_end.replace(/ \d{4}$/, '')}` : 'TBA'} · playoffs from ${info?.playoffs_start?.replace(/ \d{4}$/, '') || 'TBA'} · ₹${info?.fee ?? 300} entry, paid later · `} />
 
         <section className="wrap" data-section>
           <h2 className="display" data-decode>How it works</h2>
@@ -147,7 +147,7 @@ export default function Draft() {
 
         <section className="wrap" data-section>
           <h2 className="display" data-decode>Schedule</h2>
-          <Schedule date={info?.event_date} teams={info?.teams} />
+          <Schedule info={info} />
         </section>
 
         {teams.length > 0 && (

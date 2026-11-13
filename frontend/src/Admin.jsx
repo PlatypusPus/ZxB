@@ -175,6 +175,9 @@ const STATUS = { draft: 'Draft (hidden)', registration_open: 'Open for sign-ups'
 const SECTIONS = [
   { title: 'Event', note: 'What players see on the site.', fields: [
     { k: 'event_date', label: 'Auction date', kind: 'text', hint: 'Shown on the site, e.g. 15 Nov 2026' },
+    { k: 'group_start', label: 'Group stage starts', kind: 'text', hint: 'e.g. 15 Nov 2026. Leave empty for TBA' },
+    { k: 'group_end', label: 'Group stage ends', kind: 'text', hint: 'e.g. 21 Nov 2026. Playoff times are agreed that night' },
+    { k: 'playoffs_start', label: 'Playoffs start', kind: 'text', hint: 'e.g. 23 Nov 2026. Later rounds show TBA' },
     { k: 'registration_opens_at', label: 'Registration opens', kind: 'time', hint: 'Optional, India time' },
     { k: 'registration_closes_at', label: 'Registration closes', kind: 'time', hint: 'Optional, India time' },
   ] },

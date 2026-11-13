@@ -282,16 +282,19 @@ INT_KEYS = {"fee", "teams", "credits_per_team", "min_players", "max_players", "f
             "bid_increment_high", "bid_increment_from", "bid_timer", "bid_reset", "round2_discount"}
 CAN_BE_ZERO = {"bid_increment_from", "bid_timer", "round2_discount"}
 CHOICES = {"base_price_mode": ("band", "flat"), "lot_order": ("rank_band", "random")}
-SETTINGS_KEYS = INT_KEYS | set(CHOICES) | {"event_date", "upi_id", "upi_name", "registration_opens_at",
+SCHEDULE_KEYS = {"group_start", "group_end", "playoffs_start"}   # the tournament runs after the auction, so these stay editable
+SETTINGS_KEYS = INT_KEYS | set(CHOICES) | SCHEDULE_KEYS | {"event_date", "upi_id", "upi_name", "registration_opens_at",
                                            "registration_closes_at", "role_caps", "band_base_price"}
 
 
 @router.put("/settings")
 async def put_settings(body: dict, db: AsyncSession = Depends(get_db), admin: str = Depends(require_admin)):
     t, _ = await load(db, lock=True)
-    if t.locked_at:
-        raise HTTPException(409, "Settings are locked once the auction starts")
     changes = {k: v for k, v in body.get("settings", {}).items() if k in SETTINGS_KEYS}
+    if t.locked_at:
+        if any(k not in SCHEDULE_KEYS and t.settings.get(k) != v for k, v in changes.items()):
+            raise HTTPException(409, "Settings are locked once the auction starts (tournament dates can still change)")
+        changes = {k: v for k, v in changes.items() if k in SCHEDULE_KEYS}
     for k in ("registration_opens_at", "registration_closes_at"):
         if changes.get(k):
             try:

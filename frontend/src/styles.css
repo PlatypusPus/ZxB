@@ -456,8 +456,10 @@ h1.hero-logo { max-width: 860px; width: 100%; margin: 0 auto; justify-content: c
 .hero-count > p { margin: 0; }
 .hero-days { display: flex; align-items: baseline; gap: 14px; }
 .hero-days b { font-size: 64px; line-height: 1; color: var(--amber); font-weight: 400; }
-.hero-dates { list-style: none; margin: 0; padding: 0; display: grid; border-top: 1px solid var(--line); }
-.hero-dates li { display: grid; grid-template-columns: 10ch 4ch 1fr; align-items: baseline; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.hero-dates { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: max-content max-content 1fr; column-gap: 18px; border-top: 1px solid var(--line); }
+/* subgrid: every row shares the same columns, each as wide as its longest entry */
+.hero-dates li { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: baseline; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.hero-dates b, .hero-dates .mono { white-space: nowrap; }
 .hero-dates b { font-weight: 400; font-size: 18px; color: var(--ink); }
 .hero-dates li > span:last-child { font-weight: 600; }
 @media (max-width: 900px) {

@@ -116,13 +116,15 @@ export function Schedule({ info }) {
   )
 }
 
-export function SlotMeter({ info }) {
+export function SlotMeter({ info, teams = [] }) {
   const total = info?.teams ?? 10, left = info?.leader_slots_left ?? total
   return (
     <div className="meter">
       <p className="mono muted">TEAM SLOTS</p>
       <div className="meter-tiles" role="img" aria-label={`${left} of ${total} team slots open`}>
-        {Array.from({ length: total }, (_, i) => <span key={i} className={i < total - left ? 'taken' : ''} />)}
+        {Array.from({ length: total }, (_, i) => teams[i]
+          ? <span key={i} className="logo-tile" title={teams[i].name}><img src={teams[i].logo_url} alt="" /></span>
+          : <span key={i} className={i < total - left ? 'taken' : ''} />)}
       </div>
       <p className="mono"><span className="amber">{left}</span> OF {total} OPEN</p>
     </div>

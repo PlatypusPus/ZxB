@@ -95,7 +95,7 @@ export default function Draft() {
           </div>
           <aside className="card hero-panel" data-build aria-label="At a glance">
             <p className="mono muted">AT A GLANCE</p>
-            <SlotMeter info={info} />
+            <SlotMeter info={info} teams={teams} />
             <dl className="facts">
               <div><dt className="mono muted">TEAMS</dt><dd>{info?.teams ?? 10} teams · 5 + subs</dd></div>
               <div><dt className="mono muted">ROSTER</dt><dd>Captain + {info?.min_players ?? 4} or more</dd></div>

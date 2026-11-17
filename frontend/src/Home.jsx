@@ -113,7 +113,7 @@ export default function Home() {
                   <li><span>Bidding</span><b>Called out in the room</b></li>
                   <li><span>Unspent credits</span><b>Lost at the end</b></li>
                 </ul>
-                <SlotMeter info={info} />
+                <SlotMeter info={info} teams={teams} />
                 {open !== false && <a className="btn" href="/signup?path=leader">Sign up as a captain</a>}
               </section>
               <section className="path">

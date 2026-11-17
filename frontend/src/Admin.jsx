@@ -161,7 +161,9 @@ function Teams({ call }) {
             <h3>{r.team.name} <span className="mono amber">[{r.team.tag}]</span></h3>
             <p className="muted">Captain {r.display_name} · {r.status}</p>
             <p>Profile: {r.team.profile_status}</p>
-            {r.team.profile_status !== 'approved' && <button className="btn" onClick={() => post(`/admin/teams/${r.team.id}/approve-profile`, () => `${r.team.name} approved`)}>Approve name and logo</button>}
+            {(r.team.profile_status !== 'approved' || r.status !== 'approved') && <button className="btn" onClick={() => post(`/admin/teams/${r.team.id}/approve-profile`, x =>
+              x.status === 'waitlisted' ? `All captain slots are full, so ${r.display_name} is waitlisted` :
+              `${r.team.name} approved with captain ${r.display_name}.${x.leader_code ? ` Their captain link (shown once): ${location.origin}/leader/${x.leader_code}` : ''}`)}>Approve team and captain</button>}
             {r.status === 'approved' && <button className="btn ghost" onClick={() => post(`/admin/teams/${r.team.id}/new-code`, x => `New captain link for ${r.team.name} (old one revoked): ${location.origin}/leader/${x.leader_code}`)}>New captain link</button>}
           </article>
         ))}

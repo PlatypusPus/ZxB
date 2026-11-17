@@ -375,3 +375,16 @@ async def test_tournament_dates_stay_editable_after_auction_locks(c):
     assert (await put({"playoffs_start": "24 Nov 2026"})).status_code == 200
     assert (await c.get("/api/v1/public")).json()["playoffs_start"] == "24 Nov 2026"
     assert (await put({"fee": 999})).status_code == 409
+
+
+async def test_approving_team_approves_captain_and_shows_it_publicly(c):
+    await signup(c, path="leader")
+    row = next(iter((await queue(c)).values()))
+    url = f"/api/v1/admin/teams/{row['team']['id']}/approve-profile"
+    slots = (await c.get("/api/v1/public")).json()["leader_slots_left"]
+    assert (await c.post(url, headers=c.admin)).status_code == 409   # fee not marked paid yet
+    await c.post(f"/api/v1/admin/payments/{row['payment']['id']}/verify", headers=c.admin)
+    r = (await c.post(url, headers=c.admin)).json()
+    assert r["status"] == "approved" and r["profile_status"] == "approved" and r["leader_code"]
+    assert (await c.get("/api/v1/public")).json()["leader_slots_left"] == slots - 1
+    assert [t["name"] for t in (await c.get("/api/v1/teams")).json()] == [row["team"]["name"]]

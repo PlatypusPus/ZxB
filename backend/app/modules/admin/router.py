@@ -259,11 +259,19 @@ async def approve_team(team_id: int, db: AsyncSession = Depends(get_db), admin: 
     team = await db.get(Team, team_id)
     if not team:
         raise HTTPException(404, "Team not found")
+    leader = await db.get(Player, team.leader_player_id)
+    r = {}
+    if leader.status != "approved":
+        # Approving a team approves its captain too: that takes a slot and makes the team public.
+        r = await approve_player(leader.id, db, admin)   # 409 if the payment isn't verified yet
+        if r["status"] != "approved":
+            return r   # waitlisted: every captain slot is taken
+        team = await db.get(Team, team_id)
     team.profile_status = "approved"
     audit(db, admin, "team.profile_approved", team_id=team.id, name=team.name, tag=team.tag)
     await db.commit()
     publish("team.created", team_id=team.id)
-    return {"profile_status": team.profile_status}
+    return {**r, "profile_status": team.profile_status}
 
 
 @router.post("/teams/{team_id}/new-code")

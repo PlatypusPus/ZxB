@@ -241,6 +241,7 @@ html.gl .ticker > div { visibility: hidden; }
 .tcard header { display: flex; gap: var(--t); align-items: center; }
 .tcard header img, .logo-ph { width: calc(var(--t) * 3); aspect-ratio: 1; object-fit: cover; background: var(--tile); }
 .tcard h3 { font: 400 28px var(--display); text-transform: uppercase; }
+.tcard .pcard-photo { display: none; }
 
 /* Forms */
 .signup { display: grid; grid-template-columns: minmax(0, 1fr) calc(var(--t) * 18); gap: calc(var(--t) * 2); align-items: start; }

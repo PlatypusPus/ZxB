@@ -85,9 +85,6 @@ async def verify_payment(payment_id: int, db: AsyncSession = Depends(get_db), ad
     audit(db, admin, "payment.verified", payment_id=pay.id, player_id=p.id, utr=pay.utr)
     await db.commit()
     publish("payment.verified", player_id=p.id)
-    team = p.path == "leader" and await db.scalar(select(Team).where(Team.leader_player_id == p.id))
-    if team and team.profile_status == "approved" and p.status == "verified":
-        return {"payment_status": "verified", **await approve_player(p.id, db, admin)}   # team was approved first
     return {"payment_status": pay.status, "status": p.status}
 
 
@@ -136,9 +133,9 @@ async def notify(p: Player, event_name: str, subject: str, body: str, button: tu
 async def approve_player(player_id: int, db: AsyncSession = Depends(get_db), admin: str = Depends(require_admin)):
     t, _ = await load(db, lock=True)  # tournament row lock serialises approvals, so two can't take the 8th slot
     p, pay = await player_and_payment(db, player_id)
-    if pay.status != "verified":
+    if pay.status != "verified" and p.path != "leader":   # captains are approved before their fee is in
         raise HTTPException(409, "Verify the payment first")
-    if p.status not in ("verified", "waitlisted"):
+    if p.status not in ("verified", "waitlisted", "submitted" if p.path == "leader" else "verified"):
         raise HTTPException(409, f"Sign-up is {p.status}")
     access_link_code = None
     if p.path == "leader":
@@ -266,7 +263,7 @@ async def approve_team(team_id: int, db: AsyncSession = Depends(get_db), admin: 
     r = {}
     if leader.status != "approved":
         # Approving a team approves its captain too: that takes a slot and makes the team public.
-        r = await approve_player(leader.id, db, admin)   # 409 if the payment isn't verified yet
+        r = await approve_player(leader.id, db, admin)
         if r["status"] != "approved":
             return r   # waitlisted: every captain slot is taken
         team = await db.get(Team, team_id)
@@ -280,11 +277,11 @@ async def approve_team(team_id: int, db: AsyncSession = Depends(get_db), admin: 
 async def approve_waiting_captains(db: AsyncSession):
     """Run at startup: teams approved before approving a team also approved its captain get their captain now."""
     ids = (await db.scalars(select(Team.id).join(Player, Team.leader_player_id == Player.id)
-                            .where(Team.profile_status == "approved", Player.status == "verified"))).all()
+                            .where(Team.profile_status == "approved", Player.status.in_(["verified", "submitted"])))).all()
     for team_id in ids:
         try:
             await approve_team(team_id, db, "system")
-        except HTTPException:   # fee not marked paid yet: verifying it later approves the captain
+        except HTTPException:
             await db.rollback()
 
 

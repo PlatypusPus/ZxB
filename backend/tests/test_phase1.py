@@ -388,3 +388,30 @@ async def test_approving_team_approves_captain_and_shows_it_publicly(c):
     assert r["status"] == "approved" and r["profile_status"] == "approved" and r["leader_code"]
     assert (await c.get("/api/v1/public")).json()["leader_slots_left"] == slots - 1
     assert [t["name"] for t in (await c.get("/api/v1/teams")).json()] == [row["team"]["name"]]
+
+
+async def test_captains_of_already_approved_teams_get_approved(c):
+    from app.core import Session
+    from app.modules.admin.router import approve_waiting_captains
+    await signup(c, path="leader")
+    await signup(c, path="leader")
+    a, b = (await queue(c)).values()
+    for r in (a, b):   # the old behaviour: team approved, captain left behind
+        await c.post(f"/api/v1/admin/payments/{r['payment']['id']}/verify", headers=c.admin)
+    async with Session() as db:
+        from app.models import Team
+        for r in (a, b):
+            (await db.get(Team, r["team"]["id"])).profile_status = "approved"
+        await db.commit()
+        await approve_waiting_captains(db)
+    assert len((await c.get("/api/v1/teams")).json()) == 2
+    # Team approved before the fee was paid: marking it paid approves the captain.
+    await signup(c, path="leader")
+    d = next(r for r in (await queue(c)).values() if r["status"] == "submitted")
+    assert (await c.post(f"/api/v1/admin/teams/{d['team']['id']}/approve-profile", headers=c.admin)).status_code == 409
+    async with Session() as db:
+        (await db.get(Team, d["team"]["id"])).profile_status = "approved"
+        await db.commit()
+    r = (await c.post(f"/api/v1/admin/payments/{d['payment']['id']}/verify", headers=c.admin)).json()
+    assert r["status"] == "approved" and r["leader_code"]
+    assert len((await c.get("/api/v1/teams")).json()) == 3

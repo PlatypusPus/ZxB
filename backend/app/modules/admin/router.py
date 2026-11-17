@@ -85,6 +85,9 @@ async def verify_payment(payment_id: int, db: AsyncSession = Depends(get_db), ad
     audit(db, admin, "payment.verified", payment_id=pay.id, player_id=p.id, utr=pay.utr)
     await db.commit()
     publish("payment.verified", player_id=p.id)
+    team = p.path == "leader" and await db.scalar(select(Team).where(Team.leader_player_id == p.id))
+    if team and team.profile_status == "approved" and p.status == "verified":
+        return {"payment_status": "verified", **await approve_player(p.id, db, admin)}   # team was approved first
     return {"payment_status": pay.status, "status": p.status}
 
 
@@ -272,6 +275,17 @@ async def approve_team(team_id: int, db: AsyncSession = Depends(get_db), admin: 
     await db.commit()
     publish("team.created", team_id=team.id)
     return {**r, "profile_status": team.profile_status}
+
+
+async def approve_waiting_captains(db: AsyncSession):
+    """Run at startup: teams approved before approving a team also approved its captain get their captain now."""
+    ids = (await db.scalars(select(Team.id).join(Player, Team.leader_player_id == Player.id)
+                            .where(Team.profile_status == "approved", Player.status == "verified"))).all()
+    for team_id in ids:
+        try:
+            await approve_team(team_id, db, "system")
+        except HTTPException:   # fee not marked paid yet: verifying it later approves the captain
+            await db.rollback()
 
 
 @router.post("/teams/{team_id}/new-code")

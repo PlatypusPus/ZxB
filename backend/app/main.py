@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .core import MAX_BODY, PUBLIC_DIR, Session, hash_password, rate_limit
-from .modules.admin.router import router as admin_router
+from .modules.admin.router import approve_waiting_captains, router as admin_router
 from .modules.auction import service as auction
 from .modules.auction.router import router as auction_router, timer_loop
 from .modules.auth import router as auth_router
@@ -23,6 +23,7 @@ async def lifespan(app: FastAPI):
     await init_db()
     async with Session() as db:
         await auction.recover_after_restart(db)
+        await approve_waiting_captains(db)
     timer = asyncio.create_task(timer_loop())
     yield
     timer.cancel()

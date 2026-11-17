@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from './api.js'
+import { TeamCard } from './Cards.jsx'
 import { Footer, Nav, Schedule, SlotMeter, Ticker, dayCell, parseDay, spanCell } from './Layout.jsx'
 
 const FAQ = [
@@ -45,7 +46,11 @@ function RankLadder({ bands }) {
 
 export default function Home() {
   const [info, setInfo] = useState(null)
-  useEffect(() => { api('/public').then(setInfo).catch(() => {}) }, [])
+  const [teams, setTeams] = useState([])
+  useEffect(() => {
+    api('/public').then(setInfo).catch(() => {})
+    api('/teams').then(setTeams).catch(() => {})
+  }, [])
   const open = info?.registration_open
   const name = info?.name || 'ZenithXBeans Valorant Auction'
   const days = daysUntil(info?.event_date), auction = parseDay(info?.event_date)
@@ -82,7 +87,7 @@ export default function Home() {
                 <li><b className="digits">{groups[0]}</b><span className="mono muted">{groups[1]}</span><span>Group stage</span></li>
                 <li><b className="digits">{dayCell(playoffs)[0]}</b><span className="mono muted">{playoffs ? `${playoffs.mon} ONWARDS` : 'DATE'}</span><span>Playoffs</span></li>
               </ol>
-              <p className="mono"><span className="amber">{info?.leader_slots_left ?? '–'}</span> OF {info?.teams ?? 10} CAPTAIN SLOTS OPEN</p>
+              <p className="mono"><span className="amber">{info?.leader_slots_left ?? '–'}</span> OF {info?.teams ?? 10} TEAM SLOTS OPEN</p>
             </aside>
           </div>
         </section>
@@ -136,6 +141,11 @@ export default function Home() {
           </article>
         </section>
 
+        {teams.length > 0 && <section className="wrap" id="teams" data-section>
+          <h2 className="display" data-decode>Teams</h2>
+          <div className="grid4">{teams.map(t => <TeamCard key={t.id} t={t} />)}</div>
+        </section>}
+
         <section className="wrap" id="schedule" data-section>
           <h2 className="display" data-decode>Schedule</h2>
           <Schedule info={info} />
@@ -163,7 +173,7 @@ export default function Home() {
                 </span>
                 <span className="event-status">
                   <span className={'tag' + (open === false ? ' ghost' : '')}>{open === false ? 'SIGN-UPS CLOSED' : 'SIGN-UPS OPEN'}</span>
-                  {open !== false && info && <span className="mono muted">{info.leader_slots_left} OF {info.teams} CAPTAIN SLOTS LEFT</span>}
+                  {open !== false && info && <span className="mono muted">{info.leader_slots_left} OF {info.teams} TEAM SLOTS LEFT</span>}
                 </span>
                 <svg className="event-go" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15M13 6l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="square" /></svg>
               </a>

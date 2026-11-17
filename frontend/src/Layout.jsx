@@ -120,8 +120,8 @@ export function SlotMeter({ info }) {
   const total = info?.teams ?? 10, left = info?.leader_slots_left ?? total
   return (
     <div className="meter">
-      <p className="mono muted">CAPTAIN SLOTS</p>
-      <div className="meter-tiles" role="img" aria-label={`${left} of ${total} captain slots open`}>
+      <p className="mono muted">TEAM SLOTS</p>
+      <div className="meter-tiles" role="img" aria-label={`${left} of ${total} team slots open`}>
         {Array.from({ length: total }, (_, i) => <span key={i} className={i < total - left ? 'taken' : ''} />)}
       </div>
       <p className="mono"><span className="amber">{left}</span> OF {total} OPEN</p>

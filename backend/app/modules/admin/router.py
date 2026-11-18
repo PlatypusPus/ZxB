@@ -15,7 +15,7 @@ import os
 from ...core import (ADMIN_EMAIL, ADMIN_PASSWORD_HASH, PRIVATE_DIR, PUBLIC_DIR, audit, image_name, mail_html, process_image, send_mail, send_many, SITE, check_password, get_db, new_token,
                      publish, rate_limit, require_admin, sign_admin_token, utcnow)
 from ...models import AuditLog, Lot, Payment, Player, Team
-from ...tournament import approved_leaders, load, settings
+from ...tournament import RIOT_ID, TERMS_VERSION, approved_leaders, load, settings
 
 router = APIRouter(prefix="/admin")
 
@@ -254,6 +254,54 @@ async def leader_to_player(player_id: int, db: AsyncSession = Depends(get_db), a
     return {"status": p.status, "path": p.path, "emailed": emailed}
 
 
+@router.post("/players")
+async def add_player(body: dict, db: AsyncSession = Depends(get_db), admin: str = Depends(require_admin)):
+    """Organiser adds someone by hand: name, Riot ID, rank and role. They go straight in, approved."""
+    t, cfg = await load(db)
+    if t.locked_at:
+        raise HTTPException(409, "The auction has started")
+    name, riot = str(body.get("display_name", "")).strip(), str(body.get("riot_id", "")).strip()
+    rank, role, path = int(body.get("rank") or 0), body.get("role"), body.get("path", "auction")
+    if not 1 <= len(name) <= 32 or not RIOT_ID.match(riot) or not 1 <= rank <= len(cfg["ranks"])             or role not in cfg["roles"] or path not in ("auction", "sub"):
+        raise HTTPException(422, "Fill in the name, a Riot ID like name#tag, a rank and a role")
+    if await db.scalar(select(Player.id).where(Player.riot_id_key == riot.lower(),
+                                               Player.status.not_in(["rejected", "withdrawn"]))):
+        raise HTTPException(409, f"{riot} is already signed up")
+    p = Player(display_name=name, riot_id=riot, riot_id_key=riot.lower(), current_rank_tier=rank, peak_rank_tier=rank,
+               role=role, playstyle="", discord="", phone="", path=path, status="approved",
+               edit_token_hash=new_token()[1], terms_version=TERMS_VERSION, terms_accepted_at=utcnow())
+    db.add(p)
+    await db.flush()
+    db.add(Payment(player_id=p.id, amount=0, utr=f"FREE{p.id}", screenshot="", status="verified", verified_by=admin,
+                   verified_at=utcnow()) if path == "sub" else
+           Payment(player_id=p.id, amount=t.settings["fee"], utr=f"DUE{p.id}", screenshot="", status="due"))
+    audit(db, admin, "player.added", player_id=p.id, riot_id=riot, path=path)
+    await db.commit()
+    publish("player.approved", player_id=p.id)
+    return {"id": p.id, "status": p.status, "path": p.path}
+
+
+@router.post("/players/{player_id}/switch-path")
+async def switch_path(player_id: int, db: AsyncSession = Depends(get_db), admin: str = Depends(require_admin)):
+    """Auction player <-> sub. Only organisers can do this; players ask them."""
+    t, _ = await load(db)
+    if t.locked_at:
+        raise HTTPException(409, "The auction has started")
+    p, pay = await player_and_payment(db, player_id)
+    if p.path not in ("auction", "sub"):
+        raise HTTPException(409, "Only auction players and subs can switch")
+    p.path = "sub" if p.path == "auction" else "auction"
+    if p.path == "sub" and pay.status == "due":   # subs are free
+        pay.amount, pay.status, pay.verified_by, pay.verified_at = 0, "verified", admin, utcnow()
+        p.status = "verified" if p.status == "submitted" else p.status
+    elif p.path == "auction" and pay.amount == 0:   # a free sub now owes the entry fee
+        pay.amount, pay.status, pay.verified_by, pay.verified_at = t.settings["fee"], "due", None, None
+        p.status = "submitted" if p.status == "verified" else p.status
+    audit(db, admin, "player.switched", player_id=p.id, path=p.path)
+    await db.commit()
+    return {"status": p.status, "path": p.path}
+
+
 @router.post("/teams/{team_id}/approve-profile")
 async def approve_team(team_id: int, db: AsyncSession = Depends(get_db), admin: str = Depends(require_admin)):
     team = await db.get(Team, team_id)
@@ -403,6 +451,24 @@ async def payments_csv(db: AsyncSession = Depends(get_db), admin: str = Depends(
     w.writerow(["total_refunded", totals["refunded"]])
     return Response(out.getvalue(), media_type="text/csv",
                     headers={"Content-Disposition": "attachment; filename=payments.csv"})
+
+
+@router.get("/players.csv")
+async def players_csv(db: AsyncSession = Depends(get_db), admin: str = Depends(require_admin)):
+    _, cfg = await load(db)
+    rows = await db.execute(select(Player, Payment, Team).join(Payment, Payment.player_id == Player.id)
+                            .outerjoin(Team, Team.leader_player_id == Player.id).order_by(Player.id))
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["id", "display_name", "riot_id", "tracker_url", "path", "status", "current_rank", "peak_rank", "role",
+                "team", "discord", "phone", "email", "fee_status", "signed_up_at"])
+    for p, pay, team in rows:
+        w.writerow([p.id, p.display_name, p.riot_id, cfg["tracker_url"].format(riot_id=quote(p.riot_id, safe="")),
+                    p.path, p.status, cfg["ranks"][p.current_rank_tier - 1], cfg["ranks"][p.peak_rank_tier - 1],
+                    p.role, team.name if team else "", p.discord, p.phone, p.auth_email or "", pay.status,
+                    p.created_at.isoformat()])
+    return Response(out.getvalue(), media_type="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=players.csv"})
 
 
 @router.get("/audit")

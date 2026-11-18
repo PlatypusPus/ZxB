@@ -94,8 +94,13 @@ function Queue({ call, token }) {
           {['', 'leader', 'auction', 'sub'].map(p => <option key={p} value={p}>{PATH[p] || 'all'}</option>)}
         </select></label>
         <span className="muted">{shown.length} sign-ups</span>
+        <button className="btn ghost" onClick={async () => {
+          const res = await fetch('/api/v1/admin/players.csv', { headers: { Authorization: `Bearer ${token}` } })
+          Object.assign(document.createElement('a'), { href: URL.createObjectURL(await res.blob()), download: 'players.csv' }).click()
+        }}>Export players.csv</button>
       </div>
       {flash && <p className="flash" role="status">{flash}</p>}
+      <AddPlayer call={call} done={msg => { setFlash(msg); load() }} />
       <div className="table-wrap">
         <table>
           <thead><tr><th>Player</th><th>Rank</th><th>Path</th><th>Payment</th><th>Screenshot</th><th>Status</th><th>Actions</th></tr></thead>
@@ -124,6 +129,8 @@ function Queue({ call, token }) {
                     </>}
                     {r.path === 'leader' && !['approved', 'rejected', 'withdrawn'].includes(r.status) &&
                       <button className="btn ghost" onClick={() => act(`/admin/players/${r.id}/make-auction-player`, null, r)}>Switch to player</button>}
+                    {['auction', 'sub'].includes(r.path) && !['withdrawn', 'rejected'].includes(r.status) &&
+                      <button className="btn ghost" onClick={() => act(`/admin/players/${r.id}/switch-path`, null, r)}>{r.path === 'sub' ? 'Switch to auction player' : 'Switch to sub'}</button>}
                     {!['withdrawn', 'rejected'].includes(r.status) &&
                       <button className="btn ghost" onClick={() => act(`/admin/players/${r.id}/withdraw`, null, r)}>Withdraw</button>}
                     {['verified', 'rejected'].includes(pay.status) && ['rejected', 'withdrawn', 'waitlisted'].includes(r.status) &&
@@ -140,6 +147,34 @@ function Queue({ call, token }) {
         </table>
       </div>
     </section>
+  )
+}
+
+function AddPlayer({ call, done }) {
+  const [info, setInfo] = useState(null)
+  const [err, setErr] = useState('')
+  useEffect(() => { api('/public').then(setInfo).catch(() => {}) }, [])
+  const submit = async e => {
+    e.preventDefault()
+    const f = Object.fromEntries(new FormData(e.target))
+    try {
+      await call('/admin/players', { method: 'POST', body: f })
+      e.target.reset(); setErr(''); done(`${f.display_name} added as ${PATH[f.path].toLowerCase()}, approved.`)
+    } catch (x) { setErr(x.message) }
+  }
+  return (
+    <form className="toolbar" onSubmit={submit} aria-label="Add a player">
+      <strong>Add player</strong>
+      <input name="display_name" placeholder="Name" maxLength={32} required aria-label="Name" />
+      <input name="riot_id" placeholder="Riot ID (name#tag)" required aria-label="Riot ID" />
+      <select name="rank" required aria-label="Rank" defaultValue=""><option value="" disabled>Rank</option>
+        {info?.ranks.map((r, i) => <option key={r} value={i + 1}>{r}</option>)}</select>
+      <select name="role" required aria-label="Role" defaultValue=""><option value="" disabled>Role</option>
+        {info?.roles.map(r => <option key={r}>{r}</option>)}</select>
+      <select name="path" aria-label="Pool"><option value="auction">Auction player</option><option value="sub">Sub (free)</option></select>
+      <button className="btn">Add</button>
+      {err && <span className="err" role="alert">{err}</span>}
+    </form>
   )
 }
 

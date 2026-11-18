@@ -402,3 +402,28 @@ async def test_captains_of_already_approved_teams_get_approved(c):
         await db.commit()
         await approve_waiting_captains(db)
     assert len((await c.get("/api/v1/teams")).json()) == 2
+
+
+async def test_admin_adds_switches_and_exports_players(c):
+    add = lambda **kw: c.post("/api/v1/admin/players", headers=c.admin,
+                              json={"display_name": "Walk In", "riot_id": "walkin#ZXB", "rank": 13, "role": "Sentinel", **kw})
+    assert (await c.post("/api/v1/admin/players", json={})).status_code == 401
+    assert (await add(riot_id="no-tag")).status_code == 422
+    r = (await add()).json()
+    assert r["status"] == "approved" and r["path"] == "auction"
+    assert (await add()).status_code == 409   # same Riot ID
+    assert "walkin#ZXB" in [p["riot_id"] for p in (await c.get("/api/v1/players")).json()]
+    row = (await queue(c))["walkin#ZXB"]
+    assert row["payment"]["status"] == "due"
+    # Auction player -> sub: free, still approved. And back: owes the fee again.
+    sw = lambda: c.post(f"/api/v1/admin/players/{row['id']}/switch-path", headers=c.admin)
+    assert (await sw()).json() == {"status": "approved", "path": "sub"}
+    assert (await queue(c))["walkin#ZXB"]["payment"]["amount"] == 0
+    assert (await sw()).json() == {"status": "approved", "path": "auction"}
+    assert (await queue(c))["walkin#ZXB"]["payment"]["status"] == "due"
+    await signup(c, path="leader")
+    lead = next(p for p in (await queue(c)).values() if p["path"] == "leader")
+    assert (await c.post(f"/api/v1/admin/players/{lead['id']}/switch-path", headers=c.admin)).status_code == 409
+    text = (await c.get("/api/v1/admin/players.csv", headers=c.admin)).text
+    assert "tracker_url" in text and "https://tracker.gg/valorant/profile/riot/walkin%23ZXB/overview" in text
+    assert (await c.get("/api/v1/admin/players.csv")).status_code == 401

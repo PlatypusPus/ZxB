@@ -189,6 +189,15 @@ h2.display { font-size: clamp(32px, 5vw, 64px); }
 .captain-head img { width: 56px; height: 56px; object-fit: cover; }
 .captain-head h1 { font-size: 36px; margin: 0; }
 .captain-head p { margin: 0; }
+.bid-quick { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; }
+.bid-quick .btn { display: grid; gap: 2px; text-align: center; font-size: 26px; padding: 12px 8px; }
+.bid-quick .btn small { font-size: 11px; opacity: .75; }
+.bid-custom { display: grid; gap: 6px; }
+.bid-custom label { font-size: 11px; }
+.bid-custom > div { display: flex; gap: 8px; }
+.bid-custom input { flex: 1; min-width: 0; font-size: 20px; }
+.bid-custom .btn { flex: none; min-width: 120px; }
+.bid-quick .btn:disabled, .bid-custom .btn:disabled { opacity: 1; cursor: not-allowed; background: var(--base); border-color: var(--line); color: var(--muted, #888); }
 
 /* Admin live control */
 .controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }

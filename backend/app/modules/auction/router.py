@@ -1,4 +1,4 @@
-"""Auction API: admin live control (bids called in the room, recorded by organisers), captain team page, public snapshot + WebSocket stream, results."""
+"""Auction API: admin live control, captain bids (own phone, or called out and recorded by organisers), captain team page, public snapshot + WebSocket stream, results."""
 import asyncio
 import csv
 import io
@@ -80,11 +80,14 @@ def admin_action(name: str):
         elif name == "assign-leftovers":
             placed = await service.assign_leftovers(db, admin)
             await push("auction.completed", assigned=placed)
+        elif name == "reset":
+            await service.reset(db, admin)
+            await push("auction.reset")
         return await service.snapshot(db)
     return run
 
 
-for _name in ("start", "next", "sold", "unsold", "pause", "resume", "undo", "assign-leftovers"):
+for _name in ("start", "next", "sold", "unsold", "pause", "resume", "undo", "assign-leftovers", "reset"):
     router.post(f"/admin/auction/{_name}")(admin_action(_name))
 
 
@@ -113,6 +116,15 @@ async def leader_me(team: Team = Depends(leader_team), db: AsyncSession = Depend
     t, _ = await load(db)
     return {"team_id": team.id, "name": team.name, "tag": team.tag, "logo_url": f"/media/{team.logo}",
             "profile_status": team.profile_status, "editable": not t.locked_at}
+
+
+@router.post("/leader/bid")
+async def leader_bid(body: dict, team: Team = Depends(leader_team), db: AsyncSession = Depends(get_db)):
+    """A captain bids for their own team from their phone; any amount at or above the next bid (jump bids allowed)."""
+    rate_limit_key(f"leader-bid:{team.id}", 5, 1)   # double-taps, not real bids
+    bid = await service.place_bid(db, team.id, int(body.get("lot_id", 0)), int(body.get("amount", 0)), "leader")
+    await push("bid.accepted", team_id=bid.team_id, amount=bid.amount)
+    return {"ok": True}
 
 
 @router.patch("/leader/team")

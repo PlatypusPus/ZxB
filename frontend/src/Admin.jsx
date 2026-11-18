@@ -475,6 +475,8 @@ function Live({ call, token }) {
           <button className="btn ghost" onClick={() => act('undo')}>Undo last sale</button>
           <button className="btn ghost" onClick={() => act('assign-leftovers')} disabled={!!lot}>Final assignment and finish</button>
         </>}
+        {(running || st === 'completed') && <button className="btn danger" onClick={() =>
+          confirm('Reset the auction? Every bid and sale is wiped and all teams go back to full credits. This cannot be undone.') && act('reset')}>Reset auction</button>}
       </div>
       {lot && (
         <div className="card lotbox">

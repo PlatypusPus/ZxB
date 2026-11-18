@@ -140,6 +140,29 @@ async def test_concurrent_bids_one_winner(c):  # TC-20
     assert len(codes) == 40 and codes.count(200) == 1 and set(codes) <= {200, 409}
 
 
+async def test_captain_bids_own_team(c):
+    await small(c)
+    await c.post(A + "next", headers=c.admin)
+    lot = (await snap(c))["lot"]["id"]
+    r = await c.post("/api/v1/leader/bid", json={"lot_id": lot, "amount": 30}, headers=lead(2))   # jump bid
+    assert r.status_code == 200, r.text
+    assert (await snap(c))["lot"]["highest"] == {"amount": 30, "team_id": 2}
+    r = await c.post("/api/v1/leader/bid", json={"lot_id": lot, "amount": 40}, headers=lead(2))
+    assert r.json()["detail"] == "You're the highest bidder"
+    r = await c.post("/api/v1/leader/bid", json={"lot_id": lot, "amount": 40}, headers={"Authorization": "Leader nope"})
+    assert r.status_code == 401
+
+
+async def test_reset(c):
+    await small(c)
+    await c.post(A + "next", headers=c.admin)
+    await bid(c, 1)
+    await c.post(A + "sold", headers=c.admin)
+    s = (await c.post(A + "reset", headers=c.admin)).json()
+    assert s["status"] == "registration_closed" and s["lot"] is None and credits(s, 1) == 100 and s["pool"]["placed"] == 0
+    assert (await c.post(A + "start", headers=c.admin)).status_code == 200   # can run again
+
+
 async def test_timer_expiry(c):  # TC-22
     await small(c, bid_timer=1, bid_reset=1)
     await c.post(A + "next", headers=c.admin)

@@ -3,7 +3,7 @@ import random
 from datetime import timedelta
 
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core import audit, publish, utcnow
@@ -137,7 +137,7 @@ async def snapshot(db: AsyncSession) -> dict:
         "lot": lot and {
             "id": lot.id, "round": lot.round, "base_price": lot.base_price, "player": public_card(lot_player, cfg) | {"base_price": lot.base_price},
             "highest": top and {"amount": top.amount, "team_id": top.team_id},
-            "next_amount": amount,
+            "next_amount": amount, "step": increment(amount, s),
             "timer_end": lot.timer_end.timestamp() if lot.timer_end else None, "paused_remaining": lot.paused_remaining,
         },
         "last_closed": last and {"lot_id": last.id, "result": last.status, "player_id": last.player_id,
@@ -342,6 +342,17 @@ async def assign_leftovers(db: AsyncSession, actor: str) -> list[tuple[int, int]
     await db.commit()
     publish("auction.completed")
     return placed
+
+
+async def reset(db: AsyncSession, actor: str) -> None:
+    """Wipes every lot, bid and sale and returns to before the start; players, teams and settings stay. The audit log keeps the history."""
+    t, _ = await load(db, lock=True)
+    sales = await db.scalar(select(func.count()).select_from(Sale))
+    for model in (Sale, Bid, Lot):   # children before parents
+        await db.execute(delete(model))
+    t.status, t.locked_at = "registration_closed", None
+    audit(db, actor, "auction.reset", sales_wiped=sales)
+    await db.commit()
 
 
 async def recover_after_restart(db: AsyncSession) -> None:

@@ -131,7 +131,7 @@ function Verdict({ verdict, mainRef }) {
   return <div className={'verdict' + (verdict.sold ? '' : ' unsold')} ref={ref} role="status"><strong>{verdict.sold ? 'SOLD' : 'UNSOLD'}</strong></div>
 }
 
-// A recorded bid: flash the card so the room sees it land, without showing the amount.
+// A recorded bid: flash the card so the room sees it land.
 function useBidPulse(shown, cardRef) {
   const amount = shown?.highest?.amount, id = shown?.id
   const prev = useRef({})
@@ -144,7 +144,7 @@ function useBidPulse(shown, cardRef) {
   }, [id, amount])
 }
 
-// Bids are called out loud in the room, so the screen only shows the player up and the clock.
+// Bids are called out loud in the room; the screen shows the player up, the next bid amount and the clock.
 export default function Projector() {
   const { snap, event } = useAuction()
   const cardRef = useRef(), bannerRef = useRef(), mainRef = useRef()
@@ -173,7 +173,11 @@ export default function Projector() {
               <div><span className="sold-label">SOLD TO</span><strong>{verdict.team?.name || 'a team'}</strong></div>
               <span className="digits">{verdict.price} CR</span>
             </div>
-          : <TimerTiles left={verdict ? 0 : left} total={snap.settings.bid_timer || 20} />}
+          : <>
+              {!verdict && shown.next_amount != null &&
+                <p className="proj-next"><span className="sold-label">NEXT BID</span><span className="digits">{shown.next_amount} CR</span></p>}
+              <TimerTiles left={verdict ? 0 : left} total={snap.settings.bid_timer || 20} />
+            </>}
       </> : (
         <div className="proj-empty">
           <h1 className="display">{st === 'completed' ? 'Auction complete' : started ? 'Next player coming up' : 'The auction starts soon'}</h1>

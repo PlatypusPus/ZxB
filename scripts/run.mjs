@@ -2,6 +2,7 @@
 //   node scripts/run.mjs dev        Postgres (Docker) + API on :8010 + site on :5180
 //   node scripts/run.mjs test       quick checks: backend tests minus the slow bot simulations, then a frontend build
 //   node scripts/run.mjs test:full  everything
+//   node scripts/run.mjs demo       auction rehearsal on a throwaway database (fresh fake teams every run)
 import { execSync, spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { existsSync, writeFileSync } from 'node:fs'
@@ -27,8 +28,8 @@ function setup() {
   }
 }
 
-function start(name, cmd, cwd) {
-  const child = spawn(cmd, { cwd, shell: true })
+function start(name, cmd, cwd, env = process.env) {
+  const child = spawn(cmd, { cwd, shell: true, env })
   const tag = name === 'api' ? '\x1b[33m[api]\x1b[0m ' : '\x1b[31m[web]\x1b[0m '
   for (const stream of [child.stdout, child.stderr]) {
     stream.on('data', d => process.stdout.write(d.toString().replace(/^(?=.)/gm, tag)))
@@ -51,18 +52,29 @@ const portFree = port => new Promise(ok => {
 })
 
 setup()
-if (mode === 'dev') {
+if (mode === 'dev' || mode === 'demo') {
   for (const port of [8010, 5180]) {
     if (!(await portFree(port))) {
       console.error(`Port ${port} is already in use (an old dev server?). Stop it and run again.`)
       process.exit(1)
     }
   }
-  const kids = [
-    start('api', 'uv run --python 3.12 --env-file ../.env uvicorn app.main:app --port 8010 --host 127.0.0.1', backend),
-    start('web', 'npx vite --port 5180 --strictPort --host 127.0.0.1', frontend),
-  ]
-  console.log('\n  Site   http://127.0.0.1:5180\n  Admin  http://127.0.0.1:5180/admin\n  Ctrl+C stops both\n')
+  let api = 'uv run --python 3.12 --env-file ../.env uvicorn app.main:app --port 8010 --host 127.0.0.1', env = process.env
+  if (mode === 'demo') {
+    // Never loads .env: own database, own uploads, own admin login, no SMTP. Live data and inboxes stay untouched.
+    const psql = sql => `docker compose exec -T db psql -U postgres -tAc "${sql}"`
+    if (!read(psql("select 1 from pg_database where datname='zxb_demo'"))) run(psql('create database zxb_demo'))
+    env = { ...process.env, DATABASE_URL: 'postgresql+asyncpg://postgres:devpassword@127.0.0.1:5440/zxb_demo',
+            UPLOAD_DIR: 'uploads-demo', SECRET_KEY: randomBytes(32).toString('hex'), ADMIN_EMAIL: 'admin@demo.local',
+            ADMIN_PASSWORD_HASH: read('uv run --python 3.12 python -m app.main hash demo', backend) }
+    execSync('uv run --python 3.12 python -m scripts.seed_demo', { cwd: backend, stdio: 'inherit', env })
+    api = 'uv run --python 3.12 uvicorn app.main:app --port 8010 --host 127.0.0.1'
+  }
+  const kids = [start('api', api, backend, env), start('web', 'npx vite --port 5180 --strictPort --host 127.0.0.1', frontend)]
+  console.log(mode === 'demo'
+    ? '\n  DEMO (fake data, resets every run)\n  Admin      http://127.0.0.1:5180/admin   admin@demo.local / demo   then Live > Start auction\n' +
+      '  Projector  http://127.0.0.1:5180/projector\n  Captain    http://127.0.0.1:5180/leader/demo-leader-1  (..8)\n  Ctrl+C stops both\n'
+    : '\n  Site   http://127.0.0.1:5180\n  Admin  http://127.0.0.1:5180/admin\n  Ctrl+C stops both\n')
   const quit = () => { stopAll(kids); process.exit(0) }
   process.on('SIGINT', quit); process.on('SIGTERM', quit)
   for (const k of kids) k.on('exit', code => { if (code) { console.log(`a server exited (${code}); stopping`); quit() } })
@@ -71,6 +83,6 @@ if (mode === 'dev') {
   run('npx vite build --logLevel warn', frontend)
   console.log('\nAll checks passed.')
 } else {
-  console.error(`Unknown mode "${mode}". Use dev, test or test:full.`)
+  console.error(`Unknown mode "${mode}". Use dev, demo, test or test:full.`)
   process.exit(1)
 }

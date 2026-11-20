@@ -410,6 +410,21 @@ async def swap_player(team_id: int, body: dict, db: AsyncSession = Depends(get_d
     return {"out": old.display_name, "in": new.display_name}
 
 
+@router.post("/teams/{team_id}/group")
+async def set_group(team_id: int, body: dict, db: AsyncSession = Depends(get_db), admin: str = Depends(require_admin)):
+    grp = (body.get("group") or "").upper() or None
+    if grp not in (None, "A", "B"):
+        raise HTTPException(422, "Group must be A or B")
+    team = await db.get(Team, team_id)
+    if not team:
+        raise HTTPException(404, "Team not found")
+    team.grp = grp
+    audit(db, admin, "team.group_set", team_id=team_id, group=grp)
+    await db.commit()
+    publish("team.updated", team_id=team_id)
+    return {"id": team_id, "group": grp}
+
+
 @router.post("/teams/{team_id}/new-code")
 async def new_leader_code(team_id: int, db: AsyncSession = Depends(get_db), admin: str = Depends(require_admin)):
     """Revokes the old leader link and issues a new one."""

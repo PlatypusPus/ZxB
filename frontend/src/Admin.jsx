@@ -256,6 +256,9 @@ function TeamPage({ call, id }) {
         <div>
           <h1 className="display">{team.name} <span className="mono amber">[{team.tag}]</span></h1>
           <p className="muted">{team.players.length + 1} {team.players.length ? 'players' : 'player'} · {team.players.reduce((n, p) => n + p.price, 0)} CR spent</p>
+          <label className="tp-group">Group <select value={team.group || ''} disabled={busy} onChange={e => send(`/admin/teams/${id}/group`, { group: e.target.value }, x => x.group ? `${team.name} is in Group ${x.group}.` : `${team.name} has no group.`)}>
+            <option value="">Not set</option><option value="A">Group A</option><option value="B">Group B</option>
+          </select></label>
         </div>
       </header>
       {flash && <p className="flash" role="status">{flash}</p>}

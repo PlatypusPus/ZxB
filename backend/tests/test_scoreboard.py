@@ -154,3 +154,25 @@ async def test_search_reports_riot_ids_that_dont_resolve(c, monkeypatch):
     r = (await c.post(S + "/search", json={"team_a": 1, "team_b": 2}, headers=c.admin)).json()
     assert r["missing"] == ["ghost#T"] and r["candidates"] == []
     assert (await c.post(S + "/search", json={"team_a": 1, "team_b": 1}, headers=c.admin)).status_code == 422
+
+
+async def test_groups_split_the_standings(c):
+    await seed(n_teams=4, n_players=0)
+    from app.core import Session
+    from app.models import GameMatch, Team
+    from app.tournament import init_db
+    async with Session() as db:
+        (await db.get(Team, 1)).name = "Meow Diff!"          # punctuation and case don't matter
+        db.add(GameMatch(henrik_match_id="g1", map="Ascent", team_a_id=3, team_b_id=4, rounds_a=13, rounds_b=2, status="published"))
+        await db.commit()
+    await init_db()                                           # seeds the announced groups by team name
+    async with Session() as db:
+        assert (await db.get(Team, 1)).grp == "B" and (await db.get(Team, 2)).grp is None
+    put = lambda t, g: c.post(f"/api/v1/admin/teams/{t}/group", json={"group": g}, headers=c.admin)
+    assert (await put(2, "x")).status_code == 422
+    for t, g in ((2, "B"), (3, "a"), (4, "A")):
+        assert (await put(t, g)).json()["group"] == g.upper()
+    rows = (await c.get("/api/v1/scoreboard")).json()["standings"]
+    assert [(r["group"], r["id"]) for r in rows][:2] == [("A", 3), ("A", 4)] and {r["group"] for r in rows[2:]} == {"B"}
+    assert [t["group"] for t in (await c.get("/api/v1/teams")).json()] == ["B", "B", "A", "A"]
+    assert (await c.post("/api/v1/admin/teams/1/group", json={"group": "A"})).status_code == 401

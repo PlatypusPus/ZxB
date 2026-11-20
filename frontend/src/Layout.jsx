@@ -27,21 +27,23 @@ export function Nav({ info }) {
     return () => removeEventListener('scroll', on)
   }, [])
   const here = location.pathname.replace(/\/+$/, '') || '/'
+  const done = stage(info)
   const live = info?.status === 'auction_live' || info?.status === 'auction_paused'
-  const chip = live ? 'AUCTION LIVE' : info?.registration_open ? 'SIGN-UPS OPEN' : info ? 'SIGN-UPS CLOSED' : '…'
+  const chip = live ? 'AUCTION LIVE' : done || (info?.registration_open ? 'SIGN-UPS OPEN' : info ? 'SIGN-UPS CLOSED' : '…')
+  const cta = live ? ['/projector', 'Watch live'] : user ? ['/profile', 'My profile'] : done ? ['/scoreboard', 'Scoreboard'] : ['/signup', 'Sign up']
   return (
     <header className={'nav' + (scrolled ? ' scrolled' : '') + (open ? ' open' : '')}>
       <div className="nav-inner wrap">
         <a href="/" className="brand" aria-label="ZenithXBeans home"><Logo /></a>
         <nav id="nav-links" aria-label="Main">
-          {LINKS.map(([href, label]) => (
+          {LINKS.filter(([href]) => !(done && href === '/draft')).map(([href, label]) => (
             <a key={href} href={href} aria-current={href === here ? 'page' : undefined} onClick={() => setOpen(false)}>{label}</a>
           ))}
-          <a href={user ? '/profile' : '/signup'} className="btn nav-mobile-cta">{user ? 'My profile' : 'Sign up'}</a>
+          <a href={cta[0]} className="btn nav-mobile-cta">{cta[1]}</a>
         </nav>
         <div className="nav-right">
-          <span className={'chip' + (live || info?.registration_open ? ' hot' : '')}><span className={'live-dot' + (live || info?.registration_open ? ' on' : '')} />{chip}</span>
-          <a href={live ? '/projector' : user ? '/profile' : '/signup'} className="btn nav-cta">{live ? 'Watch live' : user ? 'My profile' : 'Sign up'}</a>
+          <span className={'chip' + (live || done || info?.registration_open ? ' hot' : '')}><span className={'live-dot' + (live || done || info?.registration_open ? ' on' : '')} />{chip}</span>
+          <a href={cta[0]} className="btn nav-cta">{cta[1]}</a>
           <button className="nav-toggle" aria-expanded={open} aria-controls="nav-links" aria-label="Menu" onClick={() => setOpen(!open)}>
             <span /><span /><span />
           </button>
@@ -66,6 +68,9 @@ export function Count({ value, prefix = '' }) {
 // ponytail: fixed schedule for this event; move into settings when there is a second tournament.
 // "15 Nov 2026" -> { day: '15', mon: 'NOV', weekday: 'Sunday', date }, or null if it can't be read.
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+// After the auction: which part of the tournament is on, from the dates in Settings.
+export const stage = info => info?.status === 'completed' ? 'GROUP STAGE' : null   // ponytail: add PLAYOFFS once they're scheduled
+
 export function parseDay(text) {
   const [d, m, y] = (text || '').split(' '), mi = MONTHS.indexOf((m || '').slice(0, 3).toLowerCase())
   if (!/^\d{1,2}$/.test(d || '') || mi < 0 || !/^\d{4}$/.test(y || '')) return null
@@ -80,39 +85,56 @@ export function spanCell(from, to) {
   if (!from || !to) return dayCell(from || to)
   return from.mon === to.mon ? [`${from.day}–${to.day}`, from.mon] : [`${from.day}–${to.day}`, `${from.mon}–${to.mon}`]
 }
-const SEEDS = ['Group A winner', 'Group B winner', 'Group A runner-up', 'Group B runner-up', 'Group A 3rd', 'Group B 3rd']
+// Where each group finish goes (Auction Cup playoffs format, 19 Nov).
+export const QUALIFY = [['1st & 2nd', 'Upper bracket', 'ub'], ['3rd & 4th', 'Play-in', 'pi'], ['5th & 6th', 'Eliminated', 'out']]
+export const qualify = rank => QUALIFY[Math.min(Math.floor(rank / 2), 2)]
 
-// Every date comes from Admin -> Settings; anything not set shows TBA.
-export function Schedule({ info }) {
+const Match = ({ title, a, b }) => (
+  <div className="br-match"><span className="mono muted">{title}</span><span>{a}</span><span>{b}</span></div>
+)
+
+// Every date comes from Admin -> Settings; playoff dates are TBA until they're scheduled.
+export function Schedule({ info, done }) {
   const auction = parseDay(info?.event_date), g1 = parseDay(info?.group_start), g2 = parseDay(info?.group_end)
-  const po = parseDay(info?.playoffs_start), tba = ['TBA', 'DATE']
+  const tba = ['TBA', 'DATE'], size = info?.teams ? info.teams / 2 : 6
   const rows = [
-    [...dayCell(auction), 'Auction', 'Captains bid on registered players. Unsold players go again at half price.', ''],
-    [...spanCell(g1, g2), 'Group stage', `${info?.teams ? info.teams + ' teams' : 'Teams'} split into 2 groups, single round robin.`, 'BO1'],
-    [...dayCell(g2), 'Playoff scheduling', 'Organisers agree playoff match times with the qualified teams that night.', ''],
-    [...dayCell(po), 'Upper bracket round 1', 'Playoffs begin. Top 3 from each group qualify.', 'BO3'],
-    [...tba, 'Lower bracket round 1', '', 'BO3'],
-    [...tba, 'Upper semifinals + lower round 2', 'Seeds 1 and 2 join here.', 'BO3'],
+    !done && [...dayCell(auction), 'Auction', 'Captains bid on registered players. Unsold players go again at half price.', ''],
+    [...spanCell(g1, g2), 'Group stage', `${info?.teams ?? 12} teams in 2 groups of ${size}, single round robin.`, 'BO1'],
+    [...tba, 'Play-in', 'A3 vs B4 and B3 vs A4, single elimination. Winners go to the lower bracket.', 'BO3'],
+    [...tba, 'Upper semifinals', 'A1 vs B2 and B1 vs A2.', 'BO3'],
+    [...tba, 'Lower round 1', 'Play-in winners vs the upper semifinal losers.', 'BO3'],
     [...tba, 'Upper final + lower final', '', 'BO3'],
     [...tba, 'Grand final', '', 'BO5'],
-  ]
+  ].filter(Boolean)
   return (
-    <div className="schedule">
-      <ol className="sched" aria-label="Schedule">
-        {rows.map(([d, label, h, p, fmt]) => (
-          <li key={h} data-build>
-            <span className="sched-date"><b className="digits">{d}</b><span className="mono muted">{label}</span></span>
-            <span><strong>{h}</strong>{p && <span className="muted"> {p}</span>}</span>
-            {fmt && <span className="tag ghost">{fmt}</span>}
-          </li>
-        ))}
-      </ol>
-      <section className="seeds" aria-labelledby="seeds-h">
-        <h3 id="seeds-h">Playoff seeding</h3>
-        <ol>{SEEDS.map((s, i) => <li key={s}><b className="digits">{i + 1}</b> {s}</li>)}</ol>
-        <p className="muted">Seeds 1 and 2 get byes to the upper semifinals. Seeds 5 and 6 start in the lower bracket.</p>
+    <>
+      <div className="schedule">
+        <ol className="sched" aria-label="Schedule">
+          {rows.map(([d, label, h, p, fmt]) => (
+            <li key={h} data-build>
+              <span className="sched-date"><b className="digits">{d}</b><span className="mono muted">{label}</span></span>
+              <span><strong>{h}</strong>{p && <span className="muted"> {p}</span>}</span>
+              {fmt && <span className="tag ghost">{fmt}</span>}
+            </li>
+          ))}
+        </ol>
+        <section className="seeds" aria-labelledby="seeds-h">
+          <h3 id="seeds-h">From each group</h3>
+          <ol>{QUALIFY.map(([place, where, k]) => <li key={k} className={'q-' + k}><b className="digits">{place}</b> {where}</li>)}</ol>
+          <p className="muted">The playoffs are a 6-team double elimination: 4 teams start in the upper bracket, 2 come in from the play-in.</p>
+        </section>
+      </div>
+      <section className="bracket" aria-label="Playoff bracket" data-build>
+        <p className="br-label mono">UPPER BRACKET</p>
+        <div className="br-col"><Match title="UB 1 · BO3" a="A1" b="B2" /><Match title="UB 2 · BO3" a="B1" b="A2" /></div>
+        <div className="br-col"><Match title="Upper final · BO3" a="Winner UB 1" b="Winner UB 2" /></div>
+        <p className="br-label mono">PLAY-IN → LOWER BRACKET</p>
+        <div className="br-col"><Match title="Play-in 1 · BO3" a="A3" b="B4" /><Match title="Play-in 2 · BO3" a="B3" b="A4" /></div>
+        <div className="br-col"><Match title="LB 1 · BO3" a="Play-in winner 1" b="Loser UB 1" /><Match title="LB 2 · BO3" a="Play-in winner 2" b="Loser UB 2" /></div>
+        <div className="br-col"><Match title="Lower final · BO3" a="Winner LB 1" b="Winner LB 2" /></div>
+        <div className="br-gf"><Match title="Grand final · BO5" a="Upper final winner" b="Lower final winner" /></div>
       </section>
-    </div>
+    </>
   )
 }
 

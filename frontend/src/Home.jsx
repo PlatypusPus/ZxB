@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from './api.js'
 import { TeamCard } from './Cards.jsx'
-import { Footer, Nav, Schedule, SlotMeter, Ticker, dayCell, parseDay, spanCell } from './Layout.jsx'
+import { Footer, Nav, Schedule, SlotMeter, Ticker, dayCell, parseDay, spanCell, stage } from './Layout.jsx'
 
 const FAQ = [
   ['What is ZenithXBeans?', 'A community that runs Valorant tournaments for players, by players.'],
@@ -52,10 +52,16 @@ export default function Home() {
     api('/teams').then(setTeams).catch(() => {})
   }, [])
   const open = info?.registration_open
+  const done = stage(info)   // null until the auction is completed
+  const faq = done ? FAQ.filter(([q]) => !/bidding|captains chosen|pay\?/.test(q)) : FAQ
+  const status = done || (open === false ? 'SIGN-UPS CLOSED' : 'SIGN-UPS OPEN')
   const name = info?.name || 'ZenithXBeans Valorant Auction'
-  const days = daysUntil(info?.event_date), auction = parseDay(info?.event_date)
+  const auction = parseDay(info?.event_date)
   const groups = spanCell(parseDay(info?.group_start), parseDay(info?.group_end)), playoffs = parseDay(info?.playoffs_start)
   const short = a => `${a.weekday.slice(0, 3)} ${a.day} ${a.mon[0] + a.mon.slice(1).toLowerCase()}`
+  // Countdown: to the auction before it, to the playoffs after it.
+  const next = done ? null : ['THE AUCTION', info?.event_date]
+  const days = next && daysUntil(next[1])
 
   return (
     <>
@@ -69,9 +75,14 @@ export default function Home() {
           </h1>
           <div className="hero-deck">
             <div className="hero-pitch">
-              <h2 className="display">Valorant <span className="pink">Auction</span></h2>
-              <p>{info?.teams ?? 10} captains, {info?.credits_per_team ?? 1000} credits each. Every player goes under the hammer live{auction ? `, on ${auction.weekday} ${auction.day} ${auction.mon[0] + auction.mon.slice(1).toLowerCase()}` : ''}, then the teams fight it out{groups[0] !== 'TBA' ? `: group stage ${groups[0]} ${groups[1][0] + groups[1].slice(1).toLowerCase()}` : ''}{playoffs ? `, playoffs from ${short(playoffs)}` : ''}.</p>
-              {open !== false && <div className="actions">
+              <h2 className="display">{done ? <>Auction <span className="pink">Cup</span></> : <>Valorant <span className="pink">Auction</span></>}</h2>
+              {done ? <p>{info?.teams ?? 10} teams, two groups, one map against every team in the group{groups[0] !== 'TBA' ? `, ${groups[0]} ${groups[1][0] + groups[1].slice(1).toLowerCase()}` : ''}. Follow every result on the scoreboard.</p>
+              : <p>{info?.teams ?? 10} captains, {info?.credits_per_team ?? 1000} credits each. Every player goes under the hammer live{auction ? `, on ${auction.weekday} ${auction.day} ${auction.mon[0] + auction.mon.slice(1).toLowerCase()}` : ''}, then the teams fight it out{groups[0] !== 'TBA' ? `: group stage ${groups[0]} ${groups[1][0] + groups[1].slice(1).toLowerCase()}` : ''}{playoffs ? `, playoffs from ${short(playoffs)}` : ''}.</p>}
+              {done && <div className="actions">
+                <a className="btn" href="/scoreboard">Scoreboard</a>
+                <a className="btn ghost" href="#teams">Meet the teams</a>
+              </div>}
+              {!done && open !== false && <div className="actions">
                 <a className="btn" href="/signup?path=leader">Be a captain</a>
                 <a className="btn ghost" href="/signup?path=auction">Get auctioned</a>
                 <a className="btn ghost" href="/signup?path=sub">Sub pool · Free</a>
@@ -80,30 +91,34 @@ export default function Home() {
             <aside className="hero-count" aria-label="Key dates">
               {days != null && days >= 0 && <p className="hero-days">
                 <b className="digits">{String(days).padStart(2, '0')}</b>
-                <span className="mono">{days === 0 ? 'AUCTION IS TODAY' : `${days === 1 ? 'DAY' : 'DAYS'} TO THE AUCTION`}</span>
+                <span className="mono">{days === 0 ? 'AUCTION IS TODAY' : `${days === 1 ? 'DAY' : 'DAYS'} TO ${next[0]}`}</span>
               </p>}
-              <ol className="hero-dates">
+              {done ? <p className="hero-days">
+                <b className="digits">{groups[0]}</b>
+                <span className="mono">{groups[1]} · GROUP STAGE</span>
+              </p> : <ol className="hero-dates">
                 <li><b className="digits">{auction?.day || 'TBA'}</b><span className="mono muted">{auction ? `${auction.mon} · ${auction.weekday.slice(0, 3).toUpperCase()}` : 'DATE'}</span><span>Auction</span></li>
                 <li><b className="digits">{groups[0]}</b><span className="mono muted">{groups[1]}</span><span>Group stage</span></li>
                 <li><b className="digits">{dayCell(playoffs)[0]}</b><span className="mono muted">{playoffs ? `${playoffs.mon} ONWARDS` : 'DATE'}</span><span>Playoffs</span></li>
-              </ol>
-              <p className="mono"><span className="amber">{info?.leader_slots_left ?? '–'}</span> OF {info?.teams ?? 10} TEAM SLOTS OPEN</p>
+              </ol>}
+              {done ? <p className="mono"><span className="amber">{info?.teams ?? 10} TEAMS</span> · 2 GROUPS · BO1</p>
+                : <p className="mono"><span className="amber">{info?.leader_slots_left ?? '–'}</span> OF {info?.teams ?? 10} TEAM SLOTS OPEN</p>}
             </aside>
           </div>
         </section>
 
-        <Ticker text={`ZenithXBeans · community tournaments · ${name} · ${open === false ? 'sign-ups closed' : 'sign-ups open'} · `} />
+        <Ticker text={`ZenithXBeans · community tournaments · ${name} · ${status.toLowerCase()} · `} />
 
         <section className="wrap" id="featured" data-section>
           <h2 className="display" data-decode>Featured tournament</h2>
           <article className="card auction-card" data-build>
             <header className="auction-head">
-              <p className="tags"><span className={'tag' + (open === false ? ' ghost' : '')}>{open === false ? 'SIGN-UPS CLOSED' : 'SIGN-UPS OPEN'}</span><span className="tag ghost">VALORANT</span><span className="tag ghost">AUCTION {info?.event_date || 'DATE TBA'}</span>{groups[0] !== 'TBA' && <span className="tag ghost">GROUPS {groups[0]} {groups[1]}</span>}</p>
+              <p className="tags"><span className={'tag' + (open === false && !done ? ' ghost' : '')}>{status}</span><span className="tag ghost">VALORANT</span>{!done && <span className="tag ghost">AUCTION {info?.event_date || 'DATE TBA'}</span>}{groups[0] !== 'TBA' && <span className="tag ghost">GROUPS {groups[0]} {groups[1]}</span>}</p>
               <h3 className="display">{name}</h3>
-              <p className="auction-sub">Captains build their rosters by buying players in a live auction. Everyone who signs up and is approved gets a team.</p>
+              <p className="auction-sub">{done ? 'Every map, the standings and the best player in each role, updated after each match.' : 'Captains build their rosters by buying players in a live auction. Everyone who signs up and is approved gets a team.'}</p>
             </header>
 
-            <div className="auction-paths">
+            {!done && <div className="auction-paths">
               <section className="path">
                 <h4 className="display">Captains</h4>
                 <p>Name your team, pick a tag and logo. You get <strong className="amber">{info?.credits_per_team ?? 1000} credits</strong> to buy at least {info?.min_players ?? 4} players. You're never auctioned.</p>
@@ -129,29 +144,36 @@ export default function Home() {
                 </div>
                 {open !== false && <a className="btn ghost" href="/signup?path=sub">Join the sub pool</a>}
               </section>
-            </div>
+            </div>}
 
             <dl className="auction-facts">
-              <div><dt className="mono muted">ENTRY</dt><dd>₹{info?.fee ?? 300}</dd></div>
+              {done ? <div><dt className="mono muted">GROUPS</dt><dd>{groups[0] !== 'TBA' ? `${groups[0]} ${groups[1]}` : 'TBA'}</dd></div>
+                : <div><dt className="mono muted">ENTRY</dt><dd>₹{info?.fee ?? 300}</dd></div>}
               <div><dt className="mono muted">TEAMS</dt><dd>{info?.teams ?? 10}</dd></div>
-              <div><dt className="mono muted">AUCTION</dt><dd>{auction ? `${auction.weekday.slice(0, 3)} ${auction.day} ${auction.mon}` : 'TBA'}</dd></div>
-              <div><dt className="mono muted">PLAYOFFS</dt><dd>{playoffs ? `From ${short(playoffs)}` : 'TBA'}</dd></div>
+              {!done && <div><dt className="mono muted">AUCTION</dt><dd>{auction ? `${auction.weekday.slice(0, 3)} ${auction.day} ${auction.mon}` : 'TBA'}</dd></div>}
+              {!done && <div><dt className="mono muted">PLAYOFFS</dt><dd>{playoffs ? `From ${short(playoffs)}` : 'TBA'}</dd></div>}
             </dl>
-            <div className="actions"><a className="btn ghost" href="/draft">Full format and rules</a><a className="btn ghost" href="/refund-policy">Refund policy</a></div>
+            <div className="actions">{done && <a className="btn" href="/scoreboard">Scoreboard</a>}<a className="btn ghost" href="/draft">Full format and rules</a>{!done && <a className="btn ghost" href="/refund-policy">Refund policy</a>}</div>
           </article>
         </section>
 
         {teams.length > 0 && <section className="wrap" id="teams" data-section>
-          <h2 className="display" data-decode>Teams</h2>
-          <div className="grid4">{teams.map(t => <TeamCard key={t.id} t={t} />)}</div>
+          <h2 className="display" data-decode>{teams.some(t => t.group) ? 'Groups' : 'Teams'}</h2>
+          {teams.some(t => t.group) ? ['A', 'B', null].map(g => {
+            const list = teams.filter(t => (t.group || null) === g)
+            return list.length > 0 && <div className="group-block" key={g || 'none'}>
+              <h3 className="display group-h">{g ? `Group ${g}` : 'Group to be announced'}</h3>
+              <div className="grid4">{list.map(t => <TeamCard key={t.id} t={t} />)}</div>
+            </div>
+          }) : <div className="grid4">{teams.map(t => <TeamCard key={t.id} t={t} />)}</div>}
         </section>}
 
         <section className="wrap" id="schedule" data-section>
           <h2 className="display" data-decode>Schedule</h2>
-          <Schedule info={info} />
+          <Schedule info={info} done={!!done} />
         </section>
 
-        <section className="wrap" data-section>
+        {!done && <section className="wrap" data-section>
           <h2 className="display" data-decode>How it works</h2>
           <div className="grid3">
             {[['01', 'Sign up', 'Pick a tournament and fill your player card. The entry fee is collected later to confirm your spot.'],
@@ -159,21 +181,21 @@ export default function Home() {
               ['03', 'Play', 'Get your team, play the bracket, and see the results posted publicly.']]
               .map(([n, h, p]) => <article className="card" data-build key={n}><p className="mono amber">{n}</p><h3>{h}</h3><p>{p}</p></article>)}
           </div>
-        </section>
+        </section>}
 
         <section className="wrap" id="tournaments" data-section>
           <h2 className="display" data-decode>Tournaments</h2>
           <ol className="events">
             <li data-build>
-              <a className="event" href="/draft" aria-label={`${name}, ${open === false ? 'sign-ups closed' : 'sign-ups open'}`}>
+              <a className="event" href={done ? '/scoreboard' : '/draft'} aria-label={`${name}, ${status.toLowerCase()}`}>
                 <EventDate date={info?.event_date} />
                 <span className="event-main">
                   <span className="event-title display">{name}</span>
-                  <span className="event-meta mono muted">VALORANT · AUCTION DAY · {info?.teams ?? 10} TEAMS · ₹{info?.fee ?? 300} ENTRY</span>
+                  <span className="event-meta mono muted">VALORANT · {done ? `${info?.teams ?? 10} TEAMS · SEE THE SCOREBOARD` : `AUCTION DAY · ${info?.teams ?? 10} TEAMS · ₹${info?.fee ?? 300} ENTRY`}</span>
                 </span>
                 <span className="event-status">
-                  <span className={'tag' + (open === false ? ' ghost' : '')}>{open === false ? 'SIGN-UPS CLOSED' : 'SIGN-UPS OPEN'}</span>
-                  {open !== false && info && <span className="mono muted">{info.leader_slots_left} OF {info.teams} TEAM SLOTS LEFT</span>}
+                  <span className={'tag' + (open === false && !done ? ' ghost' : '')}>{status}</span>
+                  {!done && open !== false && info && <span className="mono muted">{info.leader_slots_left} OF {info.teams} TEAM SLOTS LEFT</span>}
                 </span>
                 <svg className="event-go" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15M13 6l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="square" /></svg>
               </a>
@@ -184,7 +206,7 @@ export default function Home() {
 
         <section className="wrap" data-section>
           <h2 className="display" data-decode>FAQ</h2>
-          {FAQ.map(([q, a]) => <details className="card faq" data-build key={q}><summary>{q}</summary><p>{a}</p></details>)}
+          {faq.map(([q, a]) => <details className="card faq" data-build key={q}><summary>{q}</summary><p>{a}</p></details>)}
         </section>
       </main>
       <Footer />

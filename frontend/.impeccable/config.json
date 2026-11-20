@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/styles.css"
+        ],
+        "createdAt": "2026-11-20T10:56:25.644Z",
+        "reason": "Claude decided: standings-table qualification-zone marker (upper bracket / play-in / out) with a legend, standard esports convention, not a card accent"
+      }
+    ]
+  }
+}

@@ -225,7 +225,7 @@ def role_leaders(stats: list[dict]) -> list[dict]:
 # ---------- database side
 
 def team_card(t: Team) -> dict:
-    return {"id": t.id, "name": t.name, "tag": t.tag, "logo_url": f"/media/{t.logo}"}
+    return {"id": t.id, "name": t.name, "tag": t.tag, "logo_url": f"/media/{t.logo}", "group": t.grp}
 
 
 async def lineups(db: AsyncSession) -> dict[int, dict]:
@@ -376,7 +376,10 @@ async def board(db: AsyncSession, published_only: bool = True) -> dict:
     leaders = [{k: v for k, v in l.items() if k in (
         "role", "stat_label", "stat_value", "display_name", "riot_id", "card_url", "card_wide_url", "team", "games",
         "acs", "kd", "kast")} for l in role_leaders(stats)]
-    table = standings([team_card(t) for t in approved.values()],
-                      [{"team_a_id": m.team_a_id, "team_b_id": m.team_b_id, "rounds_a": m.rounds_a,
-                        "rounds_b": m.rounds_b} for m in published])
+    cards = [team_card(t) for t in approved.values()]
+    games = [{"team_a_id": m.team_a_id, "team_b_id": m.team_b_id, "rounds_a": m.rounds_a, "rounds_b": m.rounds_b}
+             for m in published]
+    # ranked within each group (A, B; teams without a group last)
+    table = [row for g in sorted({c["group"] or "~" for c in cards})
+             for row in standings([c for c in cards if (c["group"] or "~") == g], games)]
     return {"role_leaders": leaders, "standings": table, "matches": out_matches}

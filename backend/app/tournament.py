@@ -39,6 +39,12 @@ def settings(t: Tournament) -> dict:
 TERMS_VERSION = "v2"  # v2: refund policy (no refunds, swaps) and privacy pages
 
 
+GROUPS = {"A": ["ravanaesports", "ravananesports", "teamnextera", "nextera", "ataraxia", "zenparadise",
+                "bhadwayojnacentre", "bhadwayojnacenter", "bunssquad"],
+          "B": ["thekaalabilla", "kaalabilla", "kaalabillas", "godsowngamers", "meowdiff", "raaje", "toothmonsters",
+                "irisgaming"]}
+
+
 async def init_db() -> None:
     async with engine.begin() as c:
         # ponytail: create_all until the first deploy; switch to Alembic before Phase 5a.
@@ -48,6 +54,12 @@ async def init_db() -> None:
                     "puuid varchar(80)", "card_url varchar(200)", "card_wide_url varchar(200)"):
             await c.execute(text(f"ALTER TABLE player ADD COLUMN IF NOT EXISTS {col}"))
         await c.execute(text("CREATE INDEX IF NOT EXISTS ix_player_puuid ON player (puuid)"))
+        await c.execute(text("ALTER TABLE team ADD COLUMN IF NOT EXISTS grp varchar(1)"))
+        # ponytail: one-off seed of the announced group allocation (19 Nov); teams already given a group are left alone,
+        # names that don't match stay blank and are set in Admin -> Teams -> Manage team.
+        for grp, names in GROUPS.items():
+            await c.execute(text("UPDATE team SET grp = :g WHERE grp IS NULL AND "
+                                 "regexp_replace(lower(name), '[^a-z0-9]', '', 'g') = ANY(:n)"), {"g": grp, "n": names})
         await c.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_player_auth ON player (tournament_id, auth_provider, auth_sub) "
                              "WHERE auth_sub IS NOT NULL AND status NOT IN ('rejected', 'withdrawn')"))
     async with Session() as db:

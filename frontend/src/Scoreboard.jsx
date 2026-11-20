@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from './api.js'
-import { Footer, Nav } from './Layout.jsx'
+import { Footer, Nav, QUALIFY, qualify } from './Layout.jsx'
 
 // ⓘ button next to a section title. <details> needs no JS and works with keyboard and screen readers.
 export function Info({ label, children }) {
@@ -110,16 +110,20 @@ export default function Scoreboard() {
                 <li><b>Pts</b>: points. A win is 3, a loss by 3 rounds or fewer (including overtime) is 1, a bigger loss is 0.</li>
               </ul>
               <p>Ties are split by RD, then rounds won, then the result between the two teams.</p>
+              <p>Teams are ranked within their group: {QUALIFY.map(([p, w]) => `${p} → ${w.toLowerCase()}`).join(', ')}.</p>
             </Head>
-            <div className="table-wrap">
+            {[...new Set(data.standings.map(t => t.group || ''))].map(g => {
+              const rows = data.standings.filter(t => (t.group || '') === g)
+              return <div className="table-wrap" key={g}>
               <table className="sb-table sb-standings">
+                {g && <caption>Group {g}</caption>}
                 <thead><tr>
                   <th scope="col">#</th><th scope="col">Team</th>
                   {[['P', 'Played'], ['W', 'Wins'], ['L', 'Losses'], ['RW', 'Rounds won'], ['RL', 'Rounds lost'], ['RD', 'Round difference'], ['Pts', 'Points']]
                     .map(([c, t]) => <th key={c} title={t} scope="col">{c}</th>)}
                 </tr></thead>
-                <tbody>{data.standings.map((t, i) => (
-                  <tr key={t.id}>
+                <tbody>{rows.map((t, i) => (
+                  <tr key={t.id} className={g ? 'q-' + qualify(i)[2] : ''} title={g ? qualify(i)[1] : undefined}>
                     <td className="digits">{i + 1}</td>
                     <td><span className="sb-side"><Logo team={t} />{t.name} <span className="muted">[{t.tag}]</span></span></td>
                     <td>{t.p}</td><td>{t.w}</td><td>{t.l}</td><td>{t.rw}</td><td>{t.rl}</td>
@@ -127,7 +131,9 @@ export default function Scoreboard() {
                   </tr>
                 ))}</tbody>
               </table>
+              {g && <p className="sb-key mono muted">{QUALIFY.map(([p, w, k]) => <span key={k} className={'q-' + k}>{p} · {w}</span>)}</p>}
             </div>
+            })}
           </section>
 
           <section aria-labelledby="matches">

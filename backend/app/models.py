@@ -106,6 +106,7 @@ class Team(Base):
     tag: Mapped[str] = mapped_column(String(4))
     logo: Mapped[str] = mapped_column(String(40))
     profile_status: Mapped[str] = mapped_column(String(10), default="pending")  # pending, approved
+    grp: Mapped[str | None] = mapped_column(String(1))   # group stage group: "A" or "B"
     access_code_hash: Mapped[str | None] = mapped_column(String(64))
 
 

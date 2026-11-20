@@ -54,7 +54,8 @@ async def teams(db: AsyncSession = Depends(get_db)):
                             .order_by(Team.id))
     sales = (await db.execute(select(Sale, Player).join(Player, Sale.player_id == Player.id)
                               .where(Sale.undone_at.is_(None)).order_by(Sale.id))).all()
-    return [{"id": t.id, "name": t.name, "tag": t.tag, "logo_url": f"/media/{t.logo}", "leader": public_card(p, cfg),
+    return [{"id": t.id, "name": t.name, "tag": t.tag, "logo_url": f"/media/{t.logo}", "group": t.grp,
+             "leader": public_card(p, cfg),
              "roster": [{"id": sp.id, "display_name": sp.display_name, "role": sp.role, "price": sale.price}
                         for sale, sp in sales if sale.team_id == t.id]} for t, p in rows]
 

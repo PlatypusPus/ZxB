@@ -786,3 +786,5 @@ h1.display.vt-head { font-size: clamp(32px, 4.5vw, 56px); margin: 0 0 var(--t); 
 .sb-from { display: grid; gap: 6px; max-width: 32rem; margin-bottom: var(--t); }
 @media (max-width: 600px) { .vt-teams { grid-template-columns: 1fr; } }
 .sched-lede { margin: -8px 0 var(--t); }
+fieldset.field { border: 0; padding: 0; margin: 0 0 calc(var(--t) * .75); min-width: 0; }
+.settings :is(input, select):disabled { opacity: .45; cursor: not-allowed; }

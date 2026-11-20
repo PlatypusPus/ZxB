@@ -309,6 +309,7 @@ function Teams({ call }) {
 
 // Settings form, grouped the way an organiser thinks about the event. Keys match the API's settings object.
 const STATUS = { draft: 'Draft (hidden)', registration_open: 'Open for sign-ups', registration_closed: 'Closed' }
+const SCHED = ['group_start', 'group_end', 'playoffs_start']   // the backend keeps these editable after the auction
 const SECTIONS = [
   { title: 'Event', note: 'What players see on the site.', fields: [
     { k: 'event_date', label: 'Auction date', kind: 'text', hint: 'Shown on the site, e.g. 15 Nov 2026' },
@@ -372,6 +373,7 @@ function Settings({ call }) {
     e.preventDefault()
     const out = {}
     for (const f of ALL) {
+      if (s.locked && !SCHED.includes(f.k)) continue   // after the auction only the dates can change
       const v = cfg[f.k]
       if (f.kind === 'num') { if (v === '' || v == null) { if (f.optional) out[f.k] = null } else out[f.k] = +v }
       else if (f.kind === 'qr') continue   // saved by its own upload button
@@ -417,23 +419,23 @@ function Settings({ call }) {
             inputMode={f.kind === 'num' ? 'numeric' : undefined} value={cfg[f.k] ?? ''} aria-invalid={!!err}
             onChange={e => setK(f.k, e.target.value)} />
     return (
-      <div className="field" key={f.k}><label htmlFor={id}>{f.label}</label>
+      <fieldset className="field" disabled={s.locked && !SCHED.includes(f.k)} key={f.k}><label htmlFor={id}>{f.label}</label>
         {f.unit ? <div className={'unit' + (f.unit === '₹' ? ' pre' : '')}>{input}<span aria-hidden="true">{f.unit}</span></div> : input}
-        {f.hint && <p className="hint">{f.hint}</p>}{errP}</div>)
+        {f.hint && <p className="hint">{f.hint}</p>}{errP}</fieldset>)
   }
 
   return (
     <form className="settings" onSubmit={save}>
-      {s.locked && <p className="err settings-lock">Locked: the auction has started, so budgets and prices can’t change.</p>}
+      {s.locked && <p className="hint settings-lock">{s.status === 'completed' ? 'The auction is over' : 'The auction has started'}, so teams, budgets and prices are locked. You can still change the group stage and playoff dates.</p>}
       {SECTIONS.map((sec, i) => (
-        <fieldset className="set-card" disabled={s.locked} key={sec.title}>
+        <fieldset className="set-card" disabled={s.locked && !sec.fields.some(x => SCHED.includes(x.k))} key={sec.title}>
           <legend>{sec.title}</legend>{sec.note && <p className="hint">{sec.note}</p>}
           <div className="set-grid">
             {i === 0 && <>
               <div className="field wide"><label htmlFor="s-name">Tournament name</label>
-                <input id="s-name" value={s.name} onChange={e => { setS({ ...s, name: e.target.value }); setMsg('') }} /></div>
+                <input id="s-name" disabled={s.locked} value={s.name} onChange={e => { setS({ ...s, name: e.target.value }); setMsg('') }} /></div>
               <div className="field"><label htmlFor="s-status">Sign-ups</label>
-                <select id="s-status" value={s.status} onChange={e => { setS({ ...s, status: e.target.value }); setMsg('') }}>
+                <select id="s-status" disabled={s.locked} value={s.status} onChange={e => { setS({ ...s, status: e.target.value }); setMsg('') }}>
                   {Object.entries(STATUS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                   {!STATUS[s.status] && <option value={s.status}>{s.status.replaceAll('_', ' ')}</option>}
                 </select></div>
@@ -444,7 +446,7 @@ function Settings({ call }) {
       ))}
       <div className="settings-save">
         <p className={msg === 'Saved' ? 'ok' : msg ? 'err' : 'hint'} role="status">{msg || 'Changes apply as soon as you save.'}</p>
-        <button className="btn" disabled={s.locked || busy}>{busy ? 'Saving…' : 'Save settings'}</button>
+        <button className="btn" disabled={busy}>{busy ? 'Saving…' : 'Save settings'}</button>
       </div>
     </form>
   )

@@ -183,10 +183,43 @@ function AddPlayer({ call, done }) {
 function Teams({ call }) {
   const [rows, setRows] = useState([])
   const [flash, setFlash] = useState('')
-  const load = () => call('/admin/queue').then(r => setRows(r.filter(x => x.team)))
+  const [rosters, setRosters] = useState({ teams: {}, free: [] })
+  const [swap, setSwap] = useState(null)   // { team, out, in } while choosing a replacement
+  const load = () => {
+    call('/admin/queue').then(r => setRows(r.filter(x => x.team)))
+    call('/admin/rosters').then(setRosters).catch(() => {})
+  }
   useEffect(() => { load() }, [])
-  const post = async (path, ok) => {
-    try { const r = await call(path, { method: 'POST', body: {} }); setFlash(ok(r)); load() } catch (e) { setFlash(e.message) }
+  const post = async (path, ok, body = {}) => {
+    try { const r = await call(path, { method: 'POST', body }); setFlash(ok(r)); setSwap(null); load() } catch (e) { setFlash(e.message) }
+  }
+  const roster = team => {
+    const r = rosters.teams[team.id]
+    if (!r) return null
+    return (
+      <div className="roster">
+        <p className="mono muted">ROSTER · {r.players.length + 1}</p>
+        <ul>
+          <li><span><strong>{r.captain.display_name}</strong> <span className="tag ghost">Captain</span><br /><span className="muted small">{r.captain.riot_id} · {r.captain.role}</span></span></li>
+          {r.players.map(p => (
+            <li key={p.id}>
+              <span><strong>{p.display_name}</strong> <span className="mono amber">{p.price} CR</span><br /><span className="muted small">{p.riot_id} · {p.role} · {p.rank}</span></span>
+              {swap?.team === team.id && swap.out === p.id ? (
+                <span className="swap">
+                  <select aria-label={`Replacement for ${p.display_name}`} value={swap.in || ''} onChange={e => setSwap({ ...swap, in: +e.target.value })}>
+                    <option value="">Replace with…</option>
+                    {rosters.free.map(f => <option key={f.id} value={f.id}>{f.display_name} · {f.role} · {f.rank}{f.path === 'sub' ? ' · sub' : ''}</option>)}
+                  </select>
+                  <button className="btn" disabled={!swap.in} onClick={() => post(`/admin/teams/${team.id}/swap`, x => `${x.in} replaces ${x.out} on ${team.name}. Price and credits are unchanged.`, { out_player_id: p.id, in_player_id: swap.in })}>Swap</button>
+                  <button className="btn ghost" onClick={() => setSwap(null)}>Cancel</button>
+                </span>
+              ) : <button className="btn ghost" onClick={() => setSwap({ team: team.id, out: p.id })}>Swap out</button>}
+            </li>
+          ))}
+        </ul>
+        {!r.players.length && <p className="muted small">No players bought yet.</p>}
+      </div>
+    )
   }
   return (
     <section>
@@ -202,6 +235,7 @@ function Teams({ call }) {
               x.status === 'waitlisted' ? `All captain slots are full, so ${r.display_name} is waitlisted` :
               `${r.team.name} approved with captain ${r.display_name}.${x.leader_code ? ` Their captain link (shown once): ${location.origin}/leader/${x.leader_code}` : ''}`)}>Approve team and captain</button>}
             {r.status === 'approved' && <button className="btn ghost" onClick={() => post(`/admin/teams/${r.team.id}/new-code`, x => `New captain link for ${r.team.name} (old one revoked): ${location.origin}/leader/${x.leader_code}`)}>New captain link</button>}
+            {roster(r.team)}
           </article>
         ))}
       </div>

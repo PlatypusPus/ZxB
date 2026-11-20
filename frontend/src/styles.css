@@ -683,3 +683,9 @@ textarea:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
 .sb-admin-h { margin-top: calc(var(--t) * 2); }
 .sb-acts { padding: 12px var(--t) 0; }
 .sb-side .muted { margin-left: 6px; }
+.roster { margin-top: var(--t); border-top: 1px solid var(--line); padding-top: 12px; }
+.roster ul { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 8px; }
+.roster li { display: grid; gap: 6px; padding: 8px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.roster li .btn { min-height: 34px; padding: 4px 12px; font-size: 13px; justify-self: start; }
+.roster .swap { display: grid; gap: 6px; }
+.roster .swap select { width: 100%; }

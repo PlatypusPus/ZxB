@@ -14,7 +14,8 @@ import os
 
 from ...core import (ADMIN_EMAIL, ADMIN_PASSWORD_HASH, PRIVATE_DIR, PUBLIC_DIR, audit, image_name, mail_html, process_image, send_mail, send_many, SITE, check_password, get_db, new_token,
                      publish, rate_limit, require_admin, sign_admin_token, utcnow)
-from ...models import AuditLog, Lot, Payment, Player, Team
+from ...models import AuditLog, Lot, Payment, Player, Sale, Team
+from ..auction.service import active_sales, auction_teams
 from ...tournament import RIOT_ID, TERMS_VERSION, approved_leaders, load, settings
 
 router = APIRouter(prefix="/admin")
@@ -331,6 +332,50 @@ async def approve_waiting_captains(db: AsyncSession):
             await approve_team(team_id, db, "system")
         except HTTPException:
             await db.rollback()
+
+
+@router.get("/rosters")
+async def rosters(db: AsyncSession = Depends(get_db), admin: str = Depends(require_admin)):
+    """Each approved team's captain and bought players, plus who could replace someone who backs out."""
+    _, cfg = await load(db)
+    card = lambda p: {"id": p.id, "display_name": p.display_name, "riot_id": p.riot_id, "role": p.role,  # noqa: E731
+                      "rank": cfg["ranks"][p.current_rank_tier - 1], "path": p.path}
+    sales, teams = await active_sales(db), await auction_teams(db)
+    taken = {p.id for _, p in sales} | {leader.id for _, leader in teams}
+    free = await db.scalars(select(Player).where(Player.status == "approved", Player.path != "leader",
+                                                 Player.id.not_in(taken or {0})).order_by(Player.display_name))
+    return {"teams": {team.id: {"captain": card(leader), "players": [card(p) | {"price": sale.price}
+                                                                     for sale, p in sales if sale.team_id == team.id]}
+                      for team, leader in teams},
+            "free": [card(p) for p in free]}
+
+
+@router.post("/teams/{team_id}/swap")
+async def swap_player(team_id: int, body: dict, db: AsyncSession = Depends(get_db), admin: str = Depends(require_admin)):
+    """Someone backed out: their roster spot (and the price paid) goes to a replacement. Credits don't change."""
+    t, _ = await load(db, lock=True)
+    if t.status in ("auction_live", "auction_paused"):
+        raise HTTPException(409, "Wait until the auction is over")
+    try:
+        out_id, in_id = int(body.get("out_player_id")), int(body.get("in_player_id"))
+    except (TypeError, ValueError):
+        raise HTTPException(422, "Pick who is leaving and who replaces them")
+    sale = await db.scalar(select(Sale).where(Sale.team_id == team_id, Sale.player_id == out_id,
+                                              Sale.undone_at.is_(None)).with_for_update())
+    if not sale:
+        raise HTTPException(404, "That player isn't on this team")
+    new = await db.get(Player, in_id)
+    if not new or new.status != "approved" or new.path == "leader":
+        raise HTTPException(409, "The replacement must be an approved player or sub, not a captain")
+    if await db.scalar(select(Sale.id).where(Sale.player_id == in_id, Sale.undone_at.is_(None))):
+        raise HTTPException(409, f"{new.display_name} is already on a team")
+    old = await db.get(Player, out_id)
+    sale.player_id = in_id
+    audit(db, admin, "team.player_swapped", team_id=team_id, sale_id=sale.id, out_player_id=out_id,
+          in_player_id=in_id, out=old.display_name, replacement=new.display_name)
+    await db.commit()
+    publish("team.updated", team_id=team_id)
+    return {"out": old.display_name, "in": new.display_name}
 
 
 @router.post("/teams/{team_id}/new-code")

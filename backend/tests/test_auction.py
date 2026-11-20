@@ -272,3 +272,39 @@ async def test_websocket_hello_snapshot(c):  # TC-28 basis: a reconnecting clien
     with TestClient(app).websocket_connect("/api/v1/ws") as ws:   # no lifespan: we don't want restart recovery here
         msg = ws.receive_json()
     assert msg["event"] == "hello" and msg["snapshot"]["status"] == "auction_live" and "server_now" in msg["snapshot"]
+
+
+async def test_admin_swaps_a_player_who_backed_out(c):
+    await seed(n_teams=2, n_players=4)
+    await configure(c, max_players=2, min_players=2, bid_timer=0)
+    assert (await c.post(A + "start", headers=c.admin)).status_code == 200
+    team = 1
+    while (await c.post(A + "next", headers=c.admin)).status_code == 200:
+        await bid(c, team)
+        await c.post(A + "sold", headers=c.admin)
+        team = 3 - team
+    await c.post(A + "assign-leftovers", headers=c.admin)
+    async with core.Session() as db:   # a free sub (adding players by hand is closed once the auction starts)
+        p = Player(display_name="Standin", riot_id="standin#ZXB", riot_id_key="standin#zxb", current_rank_tier=10,
+                   peak_rank_tier=10, role="Flex", playstyle="", discord="", phone="", path="sub", status="approved",
+                   edit_token_hash=sha256("standin"), terms_version="v1", terms_accepted_at=utcnow())
+        db.add(p)
+        await db.commit()
+        sub = {"id": p.id}
+    r = (await c.get("/api/v1/admin/rosters", headers=c.admin)).json()
+    out = r["teams"]["1"]["players"][0]
+    assert r["teams"]["1"]["captain"]["display_name"] == "P0" and sub["id"] in [p["id"] for p in r["free"]]
+    before = credits(await snap(c), 1)
+
+    swap = lambda o, i, t=1: c.post(f"/api/v1/admin/teams/{t}/swap", json={"out_player_id": o, "in_player_id": i}, headers=c.admin)
+    assert (await swap(out["id"], sub["id"], t=2)).status_code == 404            # not on that team
+    assert (await swap(out["id"], 2)).status_code == 409                         # a captain can't come in
+    other = r["teams"]["2"]["players"][0]["id"]
+    assert (await swap(out["id"], other)).status_code == 409                     # already on a team
+    assert (await swap(out["id"], sub["id"])).json() == {"out": out["display_name"], "in": "Standin"}
+
+    after = (await c.get("/api/v1/admin/rosters", headers=c.admin)).json()
+    ids = [p["id"] for p in after["teams"]["1"]["players"]]
+    assert sub["id"] in ids and out["id"] not in ids and out["id"] in [p["id"] for p in after["free"]]
+    assert credits(await snap(c), 1) == before                                    # same price, same credits
+    assert (await c.post("/api/v1/admin/teams/1/swap", json={})).status_code == 401

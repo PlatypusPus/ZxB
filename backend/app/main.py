@@ -81,7 +81,7 @@ if (DIST / "index.html").is_file():
         if path and f.is_file() and DIST.resolve() in f.parents:
             return FileResponse(f)
         # Unknown pages still get the app (it shows the 404 screen), but with a real 404 status for search engines.
-        known = re.fullmatch(r"(draft|auction|signup|admin|projector|refund-policy|privacy|terms|verified|profile|"
+        known = re.fullmatch(r"(draft|auction|signup|admin|projector|scoreboard|refund-policy|privacy|terms|verified|profile|"
                              r"status/.+|leader/.+)?", path.rstrip("/"))
         return FileResponse(DIST / "index.html", status_code=200 if known else 404)
 

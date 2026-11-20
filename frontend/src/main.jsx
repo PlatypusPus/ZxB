@@ -9,6 +9,7 @@ import Projector from './Projector.jsx'
 import Leader from './Leader.jsx'
 import Policy from './Policy.jsx'
 import Scoreboard from './Scoreboard.jsx'
+import Veto from './Veto.jsx'
 import { NotFound, Verified } from './Pages.jsx'
 
 // ponytail: ten routes, so a pathname switch instead of a router library.
@@ -20,6 +21,7 @@ const page = path === '/draft' || path === '/auction' ? <Draft />
   : path.startsWith('/admin') ? <Admin />
   : path === '/projector' ? <Projector />
   : path === '/scoreboard' ? <Scoreboard />
+  : /^\/veto\/\d+$/.test(path) ? <Veto id={+path.slice(6)} />
   : path === '/refund-policy' ? <Policy kind="refund" />
   : path === '/privacy' ? <Policy kind="privacy" />
   : path === '/terms' ? <Policy kind="terms" />

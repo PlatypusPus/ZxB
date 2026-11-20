@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { api } from './api.js'
 import { useAuction, useCountdown } from './live.js'
 import { MatchSummary, MatchTable } from './Scoreboard.jsx'
+import { MapCard } from './Veto.jsx'
 
-const TABS = ['Queue', 'Teams', 'Live', 'Scoreboard', 'Settings', 'Email', 'Payments', 'Audit']
+const TABS = ['Queue', 'Teams', 'Live', 'Veto', 'Scoreboard', 'Settings', 'Email', 'Payments', 'Audit']
 const PATH = { leader: 'Captain', auction: 'Auction player', sub: 'Sub (free)' }
 
 export default function Admin() {
@@ -25,6 +26,7 @@ export default function Admin() {
       {!teamId && tab === 'Queue' && <Queue call={call} token={token} />}
       {!teamId && tab === 'Teams' && <Teams call={call} />}
       {!teamId && tab === 'Live' && <Live call={call} token={token} />}
+      {!teamId && tab === 'Veto' && <VetoAdmin call={call} />}
       {!teamId && tab === 'Scoreboard' && <ScoreboardAdmin call={call} />}
       {!teamId && tab === 'Settings' && <Settings call={call} />}
       {!teamId && tab === 'Email' && <Announce call={call} />}
@@ -616,7 +618,81 @@ function Live({ call, token }) {
   )
 }
 
-const MAPS = ['Abyss', 'Ascent', 'Bind', 'Breeze', 'Corrode', 'Fracture', 'Haven', 'Icebox', 'Lotus', 'Pearl', 'Split', 'Sunset']
+const VETO_STATUS = { coin: 'Waiting for the coin toss', ban: 'Banning maps', side: 'Picking a side', done: 'Finished' }
+
+// Pair two teams for a map veto. Their captains do the rest from /veto/<id>, signed in with their accounts.
+function VetoAdmin({ call }) {
+  const [data, setData] = useState(null)
+  const [flash, setFlash] = useState('')
+  const [form, setForm] = useState({ a: '', b: '', pool: null })
+  const [sure, setSure] = useState(null)
+  const load = () => call('/admin/vetoes').then(setData).catch(e => setFlash(e.message))
+  useEffect(() => { load() }, [])
+  // ponytail: refresh every 5 s so the list follows the captains' moves
+  useEffect(() => { const t = setInterval(load, 5000); return () => clearInterval(t) }, [])
+  if (!data) return <section>{flash ? <p className="err">{flash}</p> : <p className="muted">Loading…</p>}</section>
+
+  const pool = form.pool ?? data.last_pool
+  const team = id => data.teams.find(t => t.id === +id)
+  const noAccount = [form.a, form.b].map(team).filter(t => t && !t.has_account)
+  const link = id => `${location.origin}/veto/${id}`
+  const post = async (path, body, ok) => {
+    setFlash('')
+    try { const r = await call(path, { method: 'POST', body }); setFlash(ok(r)); setSure(null); load() } catch (e) { setFlash(e.message) }
+  }
+  const create = e => {
+    e.preventDefault()
+    post('/admin/vetoes', { team_a: +form.a, team_b: +form.b, pool }, r => {
+      setForm({ a: '', b: '', pool })
+      return `Veto ready. The captains get a Map veto button in the top bar once signed in, or share ${link(r.id)}`
+    })
+  }
+
+  return (
+    <section>
+      <form className="card" onSubmit={create}>
+        <h3>New map veto</h3>
+        <p className="muted">Team A's captain calls the coin toss. The winner bans first, then the captains take turns banning until one map is left. The team that didn't make the last ban picks its starting side.</p>
+        <div className="sb-picks">
+          {[['a', 'Team A (calls the toss)'], ['b', 'Team B']].map(([k, label]) => (
+            <label key={k} className="sb-pick">{label}<select value={form[k]} required onChange={e => setForm({ ...form, [k]: e.target.value })}>
+              <option value="">Choose a team</option>
+              {data.teams.map(t => <option key={t.id} value={t.id} disabled={String(t.id) === form[k === 'a' ? 'b' : 'a']}>{t.group ? `[${t.group}] ` : ''}{t.name}</option>)}
+            </select></label>
+          ))}
+        </div>
+        <p className="vt-pool-h"><strong>Map pool</strong> <span className="muted small">{pool.length} selected · tap a map to add or remove it</span></p>
+        <ul className="vt-maps">{data.maps.map((m, i) => {
+          const on = pool.includes(m)
+          return <li key={m}><MapCard map={m} i={i} state={on ? 'in' : 'off'} tag={on ? 'IN POOL' : ''} pressed={on}
+            onClick={() => setForm(f => { const cur = f.pool ?? data.last_pool; return { ...f, pool: cur.includes(m) ? cur.filter(x => x !== m) : data.maps.filter(x => x === m || cur.includes(x)) } })} /></li>
+        })}</ul>
+        {noAccount.map(t => <p key={t.id} className="err">{t.captain} ({t.name}) hasn't signed in with an account yet, so they can't veto until they do.</p>)}
+        <div className="actions"><button className="btn" disabled={!form.a || !form.b || pool.length < 2}>Start veto</button></div>
+      </form>
+      {flash && <p className="flash" role="status">{flash}</p>}
+
+      <h3 className="display sb-admin-h">Vetoes</h3>
+      {!data.vetoes.length && <p className="muted">No vetoes yet.</p>}
+      <ul className="vt-list">{data.vetoes.map(v => (
+        <li key={v.id}>
+          <span><strong>{v.team_a?.name} vs {v.team_b?.name}</strong><br />
+            <span className="muted small">{VETO_STATUS[v.status]}{v.map ? ` · ${v.map}` : ''}{v.side ? ` · ${data.teams.find(t => t.id === v.side_team_id)?.tag} on ${v.side}` : ''}</span></span>
+          <span className="tp-acts">
+            <a className="btn ghost" href={`/veto/${v.id}`} target="_blank" rel="noreferrer">Open</a>
+            <button className="btn ghost" onClick={() => navigator.clipboard?.writeText(link(v.id)).then(() => setFlash(`Copied ${link(v.id)}`))}>Copy link</button>
+            {v.status !== 'coin' && <button className="btn ghost" onClick={() => post(`/admin/vetoes/${v.id}/reset`, {}, () => 'Veto restarted from the coin toss.')}>Restart</button>}
+            {sure === v.id
+              ? <><button className="btn danger" onClick={() => post(`/admin/vetoes/${v.id}/delete`, {}, () => 'Veto deleted.')}>Delete for good</button><button className="btn ghost" onClick={() => setSure(null)}>Keep</button></>
+              : <button className="btn ghost" onClick={() => setSure(v.id)}>Delete</button>}
+          </span>
+        </li>
+      ))}</ul>
+    </section>
+  )
+}
+
+const MAPS = ['Abyss', 'Ascent', 'Bind', 'Breeze', 'Corrode', 'Fracture', 'Haven', 'Icebox', 'Lotus', 'Pearl', 'Split', 'Summit', 'Sunset']
 
 // Pick two teams (fix the lineup if someone was subbed), find their custom game in Henrik, import it, then publish.
 function ScoreboardAdmin({ call }) {
@@ -627,8 +703,9 @@ function ScoreboardAdmin({ call }) {
   const [found, setFound] = useState(null)
   const [busy, setBusy] = useState('')
   const [sure, setSure] = useState(null)
+  const [vetoes, setVetoes] = useState([])
   const load = () => call('/admin/scoreboard').then(setData).catch(e => setFlash(e.message))
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); call('/admin/vetoes').then(r => setVetoes(r.vetoes.filter(v => v.status === 'done'))).catch(() => {}) }, [])
   if (!data) return <section>{flash ? <p className="flash">{flash}</p> : <p className="muted">Loading…</p>}</section>
 
   const team = id => data.teams.find(t => t.id === +id)
@@ -679,6 +756,16 @@ function ScoreboardAdmin({ call }) {
     <section>
       {!data.configured && <p className="err" role="alert">The Henrik API key isn't set on the server (HENRIKDEV_API_KEY), so searches will fail.</p>}
       <p>Pick the two teams that played. If someone was subbed, remove them and add the stand-in. The search reads the players' recent custom games and only shows matches that players from both teams were in.</p>
+      {vetoes.length > 0 && <label className="sb-from">Start from a finished veto <select value="" onChange={e => {
+        const v = vetoes.find(x => x.id === +e.target.value)
+        if (!v) return
+        const ids = s => team(s)?.players.map(p => p.id) || []
+        setPick({ a: String(v.team_a.id), b: String(v.team_b.id), map: v.map }); setFound(null)
+        setLineup({ a: ids(v.team_a.id), b: ids(v.team_b.id) })
+      }}>
+        <option value="">Choose a veto</option>
+        {vetoes.map(v => <option key={v.id} value={v.id}>{v.team_a?.name} vs {v.team_b?.name} · {v.map}</option>)}
+      </select></label>}
       <div className="sb-picks">{side('a')}{side('b')}</div>
       <div className="toolbar">
         <label>Map <select value={pick.map} onChange={e => { setPick({ ...pick, map: e.target.value }); setFound(null) }}>

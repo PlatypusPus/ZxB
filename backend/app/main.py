@@ -15,6 +15,7 @@ from .modules.auction import service as auction
 from .modules.auction.router import router as auction_router, timer_loop
 from .modules.auth import router as auth_router
 from .modules.scoreboard.router import router as scoreboard_router
+from .modules.veto.router import router as veto_router
 from .modules.signup.router import router as signup_router
 from .tournament import init_db
 
@@ -55,7 +56,7 @@ async def cap_body(request: Request, call_next):
     return await call_next(request)
 
 
-for r in (signup_router, admin_router, auction_router, auth_router, scoreboard_router):
+for r in (signup_router, admin_router, auction_router, auth_router, scoreboard_router, veto_router):
     app.include_router(r, prefix="/api/v1")
 
 
@@ -81,7 +82,7 @@ if (DIST / "index.html").is_file():
         if path and f.is_file() and DIST.resolve() in f.parents:
             return FileResponse(f)
         # Unknown pages still get the app (it shows the 404 screen), but with a real 404 status for search engines.
-        known = re.fullmatch(r"(draft|auction|signup|admin|admin/team/\d+|projector|scoreboard|refund-policy|privacy|terms|verified|profile|"
+        known = re.fullmatch(r"(draft|auction|signup|admin|admin/team/\d+|projector|scoreboard|veto/\d+|refund-policy|privacy|terms|verified|profile|"
                              r"status/.+|leader/.+)?", path.rstrip("/"))
         return FileResponse(DIST / "index.html", status_code=200 if known else 404)
 

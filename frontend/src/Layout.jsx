@@ -20,7 +20,13 @@ export function Nav({ info }) {
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [user, setUser] = useState(null)
-  useEffect(() => { api('/auth/me').then(a => setUser(a.user)).catch(() => {}) }, [])
+  const [veto, setVeto] = useState(null)
+  useEffect(() => {
+    api('/auth/me').then(a => {
+      setUser(a.user)
+      if (a.user) api('/vetoes/mine').then(r => setVeto(r.id)).catch(() => {})
+    }).catch(() => {})
+  }, [])
   useEffect(() => {
     const on = () => setScrolled(scrollY > 8)
     on(); addEventListener('scroll', on, { passive: true })
@@ -42,7 +48,7 @@ export function Nav({ info }) {
           <a href={cta[0]} className="btn nav-mobile-cta">{cta[1]}</a>
         </nav>
         <div className="nav-right">
-          <span className={'chip' + (live || done || info?.registration_open ? ' hot' : '')}><span className={'live-dot' + (live || done || info?.registration_open ? ' on' : '')} />{chip}</span>
+          {veto ? <a className="btn ghost veto-btn" href={`/veto/${veto}`}><span className="live-dot on" />Map veto</a> : <span className={'chip' + (live || done || info?.registration_open ? ' hot' : '')}><span className={'live-dot' + (live || done || info?.registration_open ? ' on' : '')} />{chip}</span>}
           <a href={cta[0]} className="btn nav-cta">{cta[1]}</a>
           <button className="nav-toggle" aria-expanded={open} aria-controls="nav-links" aria-label="Menu" onClick={() => setOpen(!open)}>
             <span /><span /><span />

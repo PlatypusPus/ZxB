@@ -213,3 +213,22 @@ class GameMatchPlayer(Base):
     legshots: Mapped[int] = mapped_column(Integer, default=0)
     first_kills: Mapped[int] = mapped_column(Integer, default=0)
     first_deaths: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class Veto(Base):
+    """BO1 map veto between two captains: coin toss, alternating bans until one map is left, then a side pick."""
+    __tablename__ = "veto"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tournament_id: Mapped[int] = tournament_fk()
+    team_a_id: Mapped[int] = mapped_column(ForeignKey("team.id"))   # calls the coin toss
+    team_b_id: Mapped[int] = mapped_column(ForeignKey("team.id"))
+    pool: Mapped[list] = mapped_column(JSONB)
+    status: Mapped[str] = mapped_column(String(8), default="coin")   # coin | ban | side | done
+    call: Mapped[str | None] = mapped_column(String(5))                # heads | tails
+    coin: Mapped[str | None] = mapped_column(String(5))
+    first_team_id: Mapped[int | None] = mapped_column(Integer)        # won the toss, bans first
+    bans: Mapped[list] = mapped_column(JSONB, default=list)            # [{"team_id", "map"}] in order
+    map: Mapped[str | None] = mapped_column(String(32))
+    side_team_id: Mapped[int | None] = mapped_column(Integer)
+    side: Mapped[str | None] = mapped_column(String(8))                # attack | defense
+    created_at: Mapped[datetime] = created()

@@ -168,10 +168,10 @@ export default function Home() {
           }) : <div className="grid4">{teams.map(t => <TeamCard key={t.id} t={t} />)}</div>}
         </section>}
 
-        <section className="wrap" id="schedule" data-section>
+        {!done && <section className="wrap" id="schedule" data-section>
           <h2 className="display" data-decode>Schedule</h2>
           <Schedule info={info} done={!!done} />
-        </section>
+        </section>}
 
         {!done && <section className="wrap" data-section>
           <h2 className="display" data-decode>How it works</h2>

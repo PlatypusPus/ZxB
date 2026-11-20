@@ -1,0 +1,139 @@
+import { useEffect, useRef, useState } from 'react'
+import { api } from './api.js'
+import { Footer, Nav } from './Layout.jsx'
+
+const FLIP_MS = 1600
+const Logo = ({ team }) => team?.logo_url ? <img className="vt-logo" src={team.logo_url} alt="" /> : null
+
+// A map tile with its preview. state: in | off (admin pool), gone (banned), picked, sel (about to be banned).
+export function MapCard({ map, state = '', tag = '', i = 0, pressed, disabled, onClick }) {
+  return (
+    <button type="button" className={'mapcard ' + state} style={{ '--i': i }} disabled={disabled} onClick={onClick}
+      aria-pressed={pressed} aria-label={`${map}${tag ? `, ${tag.toLowerCase()}` : ''}`}>
+      <img src={`/maps/${map.toLowerCase()}.webp`} alt="" loading="lazy" width="640" height="360" />
+      <span className="mapcard-name display">{map}</span>
+      {tag && <span className="mapcard-tag mono">{tag}</span>}
+    </button>
+  )
+}
+
+// The coin: spins when the toss happens while you're watching, otherwise just shows the face it landed on.
+function Coin({ face, spin }) {
+  return (
+    <div className={'coin ' + (face || 'heads') + (spin ? ' spin' : '')} aria-hidden="true">
+      <span className="coin-face heads">H</span>
+      <span className="coin-face tails">T</span>
+    </div>
+  )
+}
+
+export default function Veto({ id }) {
+  const [info, setInfo] = useState(null)
+  const [v, setV] = useState(null)
+  const [err, setErr] = useState('')
+  const [pick, setPick] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [spin, setSpin] = useState(false)
+  const [revealed, setRevealed] = useState(true)
+  const seen = useRef(undefined)   // coin value at the last update; undefined until the first load
+
+  const take = s => {
+    if (seen.current === null && s.coin) {   // the toss happened while this page was open: play it
+      setSpin(true); setRevealed(false)
+      setTimeout(() => { setSpin(false); setRevealed(true) }, FLIP_MS)
+    }
+    seen.current = s.coin
+    setV(s)
+  }
+  const load = () => api(`/vetoes/${id}`).then(take).catch(e => setErr(e.message))
+  useEffect(() => { api('/public').then(setInfo).catch(() => {}); load() }, [id])
+  // ponytail: polls every 1.5 s while live; switch to the WebSocket hub if many people watch at once
+  useEffect(() => {
+    if (!v || v.status === 'done') return
+    const t = setInterval(load, 1500)
+    return () => clearInterval(t)
+  }, [v?.status])
+
+  const send = async (action, value) => {
+    setBusy(true); setErr('')
+    try { take(await api(`/vetoes/${id}/${action}`, { method: 'POST', body: { value } })); setPick('') }
+    catch (e) { setErr(e.message); load() } finally { setBusy(false) }
+  }
+
+  if (!v) return <><Nav info={info} /><main className="wrap veto"><p className={err ? 'err' : 'muted'}>{err || 'Loading…'}</p></main><Footer /></>
+
+  const team = tid => tid === v.team_a?.id ? v.team_a : v.team_b
+  const mine = v.you && v.turn === v.you
+  const winner = team(v.first_team_id)
+  const banBy = Object.fromEntries(v.bans.map((b, i) => [b.map, { ...b, n: i + 1 }]))
+  const opposite = { attack: 'defense', defense: 'attack' }
+
+  const headline = !revealed ? 'Flipping…'
+    : v.status === 'coin' ? (mine ? 'Call the coin toss' : `${v.team_a?.captain} (${v.team_a?.tag}) calls the toss`)
+    : v.status === 'ban' ? (mine ? 'Your ban' : `${team(v.turn)?.name} is banning`)
+    : v.status === 'side' ? (mine ? `Pick your starting side on ${v.map}` : `${team(v.turn)?.name} is picking a side`)
+    : `${v.map}`
+
+  return (
+    <>
+      <Nav info={info} />
+      <main className="wrap veto">
+        <p className="mono amber">MAP VETO · BO1</p>
+        <header className="vt-teams">
+          {[v.team_a, v.team_b].map(t => (
+            <div key={t?.id} className={'vt-team' + (v.turn === t?.id && revealed ? ' on' : '')}>
+              <Logo team={t} />
+              <div><strong>{t?.name}</strong><span className="muted small">Captain {t?.captain}{v.you === t?.id ? ' · you' : ''}</span></div>
+            </div>
+          ))}
+        </header>
+
+        <h1 className="display vt-head" aria-live="polite">{headline}</h1>
+        {err && <p className="err" role="alert">{err}</p>}
+
+        {(v.status === 'coin' || v.coin) && (
+          <section className="vt-coin">
+            <Coin face={v.coin} spin={spin} />
+            <div>
+              {v.status === 'coin' && (mine
+                ? <div className="actions"><button className="btn" disabled={busy} onClick={() => send('call', 'heads')}>Heads</button><button className="btn ghost" disabled={busy} onClick={() => send('call', 'tails')}>Tails</button></div>
+                : <p className="muted">The winner of the toss bans first.</p>)}
+              {v.coin && revealed && <p>{v.team_a?.tag} called {v.call}. It landed <strong className="amber">{v.coin}</strong>, so {winner?.name} bans first.</p>}
+            </div>
+          </section>
+        )}
+
+        {v.status !== 'coin' && revealed && (
+          <section aria-label="Map pool">
+            <ul className="vt-maps">
+              {v.pool.map((m, i) => {
+                const ban = banBy[m], live = v.status === 'ban' && mine && !ban
+                return (
+                  <li key={m}>
+                    <MapCard map={m} i={i} pressed={pick === m} disabled={!live || busy} onClick={() => setPick(m)}
+                      state={ban ? 'gone' : m === v.map ? 'picked' : pick === m ? 'sel' : ''}
+                      tag={ban ? `BAN ${ban.n} · ${team(ban.team_id)?.tag}` : m === v.map ? 'PLAYING' : pick === m ? 'BAN?' : ''} />
+                  </li>
+                )
+              })}
+            </ul>
+            {v.status === 'ban' && mine && <div className="actions vt-confirm">
+              <button className="btn" disabled={!pick || busy} onClick={() => send('ban', pick)}>{pick ? `Ban ${pick}` : 'Choose a map to ban'}</button>
+              <span className="muted small">{v.remaining.length - 1} {v.remaining.length === 2 ? 'ban' : 'bans'} left. The last map standing is played.</span>
+            </div>}
+            {v.status === 'side' && mine && <div className="actions vt-confirm">
+              <button className="btn" disabled={busy} onClick={() => send('side', 'attack')}>Attack</button>
+              <button className="btn" disabled={busy} onClick={() => send('side', 'defense')}>Defense</button>
+            </div>}
+            {v.status === 'done' && <p className="vt-result">
+              <strong>{v.map}</strong>. {team(v.side_team_id)?.name} starts on <strong className="amber">{v.side}</strong>, {team(v.side_team_id === v.team_a?.id ? v.team_b?.id : v.team_a?.id)?.name} on {opposite[v.side]}.
+            </p>}
+          </section>
+        )}
+
+        {!v.you && v.status !== 'done' && <p className="muted small vt-note">Captains: <a href="/profile">sign in</a> with the account you signed up with to make your moves. Everyone else can watch here.</p>}
+      </main>
+      <Footer />
+    </>
+  )
+}

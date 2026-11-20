@@ -8,7 +8,8 @@ const PATH = { leader: 'Captain', auction: 'Auction player', sub: 'Sub (free)' }
 
 export default function Admin() {
   const [token, setToken] = useState(sessionStorage.getItem('zxb-admin'))
-  const [tab, setTab] = useState('Queue')
+  const [tab, setTab] = useState(new URLSearchParams(location.search).get('tab') || 'Queue')
+  const teamId = +(location.pathname.match(/^\/admin\/team\/(\d+)/)?.[1] || 0)
   const logout = () => { sessionStorage.removeItem('zxb-admin'); setToken(null) }
   if (!token) return <Login onToken={t => { sessionStorage.setItem('zxb-admin', t); setToken(t) }} />
   const call = (path, opts = {}) => api(path, { ...opts, token }).catch(e => { if (e.status === 401) logout(); throw e })
@@ -16,17 +17,19 @@ export default function Admin() {
     <main className="admin">
       <header className="admin-bar">
         <strong className="admin-brand">ZXB <span>Admin</span></strong>
-        <nav role="tablist">{TABS.map(t => <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>{t}</button>)}</nav>
+        {teamId ? <a className="btn ghost" href="/admin?tab=Teams">← All teams</a>
+          : <nav role="tablist">{TABS.map(t => <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>{t}</button>)}</nav>}
         <button className="btn ghost" onClick={logout}>Log out</button>
       </header>
-      {tab === 'Queue' && <Queue call={call} token={token} />}
-      {tab === 'Teams' && <Teams call={call} />}
-      {tab === 'Live' && <Live call={call} token={token} />}
-      {tab === 'Scoreboard' && <ScoreboardAdmin call={call} />}
-      {tab === 'Settings' && <Settings call={call} />}
-      {tab === 'Email' && <Announce call={call} />}
-      {tab === 'Payments' && <Payments token={token} />}
-      {tab === 'Audit' && <Audit call={call} />}
+      {teamId > 0 && <TeamPage call={call} id={teamId} />}
+      {!teamId && tab === 'Queue' && <Queue call={call} token={token} />}
+      {!teamId && tab === 'Teams' && <Teams call={call} />}
+      {!teamId && tab === 'Live' && <Live call={call} token={token} />}
+      {!teamId && tab === 'Scoreboard' && <ScoreboardAdmin call={call} />}
+      {!teamId && tab === 'Settings' && <Settings call={call} />}
+      {!teamId && tab === 'Email' && <Announce call={call} />}
+      {!teamId && tab === 'Payments' && <Payments token={token} />}
+      {!teamId && tab === 'Audit' && <Audit call={call} />}
     </main>
   )
 }
@@ -180,46 +183,102 @@ function AddPlayer({ call, done }) {
   )
 }
 
+// One team on its own page: everyone on it, fix their details (a wrong Riot ID is common), or swap out someone who backed out.
+function TeamPage({ call, id }) {
+  const [data, setData] = useState(null)
+  const [flash, setFlash] = useState('')
+  const [open, setOpen] = useState(null)   // { id, mode: 'edit' | 'swap' }
+  const [form, setForm] = useState({})
+  const [busy, setBusy] = useState(false)
+  const load = () => call('/admin/rosters').then(setData).catch(e => setFlash(e.message))
+  useEffect(() => { load() }, [])
+  if (!data) return <section>{flash ? <p className="err">{flash}</p> : <p className="muted">Loading…</p>}</section>
+  const team = data.teams[id]
+  if (!team) return <section><p className="err">This team isn't approved yet, or doesn't exist.</p></section>
+
+  const send = async (path, body, ok) => {
+    setBusy(true); setFlash('')
+    try { setFlash(ok(await call(path, { method: 'POST', body }))); setOpen(null); await load() }
+    catch (e) { setFlash(e.message) } finally { setBusy(false) }
+  }
+  const edit = p => { setOpen({ id: p.id, mode: 'edit' }); setForm({ display_name: p.display_name, riot_id: p.riot_id, rank: p.tier, role: p.role }) }
+  const swap = p => { setOpen({ id: p.id, mode: 'swap' }); setForm({ in: '' }) }
+  const free = data.free || []
+  const pick = free.find(f => f.id === +form.in)
+  const opt = f => <option key={f.id} value={f.id}>{f.display_name} · {f.role} · {f.rank}</option>
+
+  const row = (p, captain) => {
+    const mode = open?.id === p.id && open.mode
+    return (
+      <li key={p.id} className={'tp-row' + (mode ? ' on' : '')}>
+        <div className="tp-who">
+          <strong>{p.display_name}</strong>
+          {captain ? <span className="tag ghost">Captain</span> : <span className="mono amber">{p.price} CR</span>}
+          <span className="muted small"><a href={p.tracker_url} target="_blank" rel="noreferrer">{p.riot_id}</a> · {p.role} · {p.rank}{p.discord ? ` · ${p.discord}` : ''}</span>
+        </div>
+        {!mode && <div className="tp-acts">
+          <button className="btn ghost" onClick={() => edit(p)}>Edit details</button>
+          {!captain && <button className="btn ghost" onClick={() => swap(p)}>Swap out</button>}
+        </div>}
+        {mode === 'edit' && (
+          <form className="tp-form" onSubmit={e => { e.preventDefault(); send(`/admin/players/${p.id}/edit`, { ...form, rank: +form.rank }, x => `Saved ${x.display_name} (${x.riot_id}).`) }}>
+            <label>Name<input value={form.display_name} maxLength={32} required onChange={e => setForm({ ...form, display_name: e.target.value })} /></label>
+            <label>Riot ID<input value={form.riot_id} required pattern="[^#]{3,16}#[A-Za-z0-9]{3,5}" title="name#tag, for example Kairo#ZXB" onChange={e => setForm({ ...form, riot_id: e.target.value })} /></label>
+            <label>Rank<select value={form.rank} onChange={e => setForm({ ...form, rank: e.target.value })}>{data.ranks.map((r, i) => <option key={r} value={i + 1}>{r}</option>)}</select></label>
+            <label>Role<select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}>{data.roles.map(r => <option key={r}>{r}</option>)}</select></label>
+            {form.riot_id !== p.riot_id && <p className="muted small tp-note">The new Riot ID is looked up again on the next scoreboard search.</p>}
+            <div className="tp-acts"><button className="btn" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button><button type="button" className="btn ghost" onClick={() => setOpen(null)}>Cancel</button></div>
+          </form>
+        )}
+        {mode === 'swap' && (
+          <div className="tp-form">
+            <label className="tp-wide">Who replaces {p.display_name}?<select value={form.in} onChange={e => setForm({ in: e.target.value })}>
+              <option value="">Choose a free player or sub</option>
+              <optgroup label="Unsold auction players">{free.filter(f => f.path !== 'sub').map(opt)}</optgroup>
+              {free.some(f => f.path === 'sub') && <optgroup label="Subs">{free.filter(f => f.path === 'sub').map(opt)}</optgroup>}
+            </select></label>
+            {pick && <p className="tp-note">{pick.display_name} ({pick.riot_id}) takes {p.display_name}'s spot at {p.price} CR, so {team.name}'s credits don't change. {p.display_name} goes back to the free list.</p>}
+            {!free.length && <p className="muted small tp-note">Nobody is free. Add a sub from the Queue tab first.</p>}
+            <div className="tp-acts">
+              <button className="btn" disabled={!pick || busy} onClick={() => send(`/admin/teams/${id}/swap`, { out_player_id: p.id, in_player_id: pick.id }, x => `${x.in} replaces ${x.out}. Price and credits are unchanged.`)}>{busy ? 'Swapping…' : 'Confirm swap'}</button>
+              <button className="btn ghost" onClick={() => setOpen(null)}>Cancel</button>
+            </div>
+          </div>
+        )}
+      </li>
+    )
+  }
+
+  return (
+    <section className="tp">
+      <header className="tp-head">
+        <img className="logo" src={team.logo_url} alt="" />
+        <div>
+          <h1 className="display">{team.name} <span className="mono amber">[{team.tag}]</span></h1>
+          <p className="muted">{team.players.length + 1} {team.players.length ? 'players' : 'player'} · {team.players.reduce((n, p) => n + p.price, 0)} CR spent</p>
+        </div>
+      </header>
+      {flash && <p className="flash" role="status">{flash}</p>}
+      <ul className="tp-list">
+        {row(team.captain, true)}
+        {team.players.map(p => row(p))}
+      </ul>
+      {!team.players.length && <p className="muted">No players bought yet.</p>}
+    </section>
+  )
+}
+
 function Teams({ call }) {
   const [rows, setRows] = useState([])
   const [flash, setFlash] = useState('')
-  const [rosters, setRosters] = useState({ teams: {}, free: [] })
-  const [swap, setSwap] = useState(null)   // { team, out, in } while choosing a replacement
+  const [rosters, setRosters] = useState({ teams: {} })
   const load = () => {
     call('/admin/queue').then(r => setRows(r.filter(x => x.team)))
     call('/admin/rosters').then(setRosters).catch(() => {})
   }
   useEffect(() => { load() }, [])
-  const post = async (path, ok, body = {}) => {
-    try { const r = await call(path, { method: 'POST', body }); setFlash(ok(r)); setSwap(null); load() } catch (e) { setFlash(e.message) }
-  }
-  const roster = team => {
-    const r = rosters.teams[team.id]
-    if (!r) return null
-    return (
-      <div className="roster">
-        <p className="mono muted">ROSTER · {r.players.length + 1}</p>
-        <ul>
-          <li><span><strong>{r.captain.display_name}</strong> <span className="tag ghost">Captain</span><br /><span className="muted small">{r.captain.riot_id} · {r.captain.role}</span></span></li>
-          {r.players.map(p => (
-            <li key={p.id}>
-              <span><strong>{p.display_name}</strong> <span className="mono amber">{p.price} CR</span><br /><span className="muted small">{p.riot_id} · {p.role} · {p.rank}</span></span>
-              {swap?.team === team.id && swap.out === p.id ? (
-                <span className="swap">
-                  <select aria-label={`Replacement for ${p.display_name}`} value={swap.in || ''} onChange={e => setSwap({ ...swap, in: +e.target.value })}>
-                    <option value="">Replace with…</option>
-                    {rosters.free.map(f => <option key={f.id} value={f.id}>{f.display_name} · {f.role} · {f.rank}{f.path === 'sub' ? ' · sub' : ''}</option>)}
-                  </select>
-                  <button className="btn" disabled={!swap.in} onClick={() => post(`/admin/teams/${team.id}/swap`, x => `${x.in} replaces ${x.out} on ${team.name}. Price and credits are unchanged.`, { out_player_id: p.id, in_player_id: swap.in })}>Swap</button>
-                  <button className="btn ghost" onClick={() => setSwap(null)}>Cancel</button>
-                </span>
-              ) : <button className="btn ghost" onClick={() => setSwap({ team: team.id, out: p.id })}>Swap out</button>}
-            </li>
-          ))}
-        </ul>
-        {!r.players.length && <p className="muted small">No players bought yet.</p>}
-      </div>
-    )
+  const post = async (path, ok) => {
+    try { const r = await call(path, { method: 'POST', body: {} }); setFlash(ok(r)); load() } catch (e) { setFlash(e.message) }
   }
   return (
     <section>
@@ -234,8 +293,8 @@ function Teams({ call }) {
             {(r.team.profile_status !== 'approved' || r.status !== 'approved') && <button className="btn" onClick={() => post(`/admin/teams/${r.team.id}/approve-profile`, x =>
               x.status === 'waitlisted' ? `All captain slots are full, so ${r.display_name} is waitlisted` :
               `${r.team.name} approved with captain ${r.display_name}.${x.leader_code ? ` Their captain link (shown once): ${location.origin}/leader/${x.leader_code}` : ''}`)}>Approve team and captain</button>}
-            {r.status === 'approved' && <button className="btn ghost" onClick={() => post(`/admin/teams/${r.team.id}/new-code`, x => `New captain link for ${r.team.name} (old one revoked): ${location.origin}/leader/${x.leader_code}`)}>New captain link</button>}
-            {roster(r.team)}
+            {r.status === 'approved' && rosters.auction_status !== 'completed' && <button className="btn ghost" onClick={() => post(`/admin/teams/${r.team.id}/new-code`, x => `New captain link for ${r.team.name} (old one revoked): ${location.origin}/leader/${x.leader_code}`)}>New captain link</button>}
+            {rosters.teams[r.team.id] && <a className="btn" href={`/admin/team/${r.team.id}`}>Manage team ({rosters.teams[r.team.id].players.length + 1} players)</a>}
           </article>
         ))}
       </div>

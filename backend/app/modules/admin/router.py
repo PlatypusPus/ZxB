@@ -16,6 +16,7 @@ from ...core import (ADMIN_EMAIL, ADMIN_PASSWORD_HASH, PRIVATE_DIR, PUBLIC_DIR, 
                      publish, rate_limit, require_admin, sign_admin_token, utcnow)
 from ...models import AuditLog, Lot, Payment, Player, Sale, Team
 from ..auction.service import active_sales, auction_teams
+from ..scoreboard.service import team_card
 from ...tournament import RIOT_ID, TERMS_VERSION, approved_leaders, load, settings
 
 router = APIRouter(prefix="/admin")
@@ -282,6 +283,35 @@ async def add_player(body: dict, db: AsyncSession = Depends(get_db), admin: str 
     return {"id": p.id, "status": p.status, "path": p.path}
 
 
+@router.post("/players/{player_id}/edit")
+async def edit_player(player_id: int, body: dict, db: AsyncSession = Depends(get_db), admin: str = Depends(require_admin)):
+    """Fix someone's details (a mistyped Riot ID, wrong rank or role). Works after the auction too."""
+    _, cfg = await load(db)
+    p = await db.get(Player, player_id)
+    if not p:
+        raise HTTPException(404, "Player not found")
+    name, riot = str(body.get("display_name", p.display_name)).strip(), str(body.get("riot_id", p.riot_id)).strip()
+    try:
+        rank = int(body.get("rank", p.current_rank_tier))
+    except (TypeError, ValueError):
+        rank = 0
+    role = body.get("role", p.role)
+    if not 1 <= len(name) <= 32 or not RIOT_ID.match(riot) or not 1 <= rank <= len(cfg["ranks"]) or role not in cfg["roles"]:
+        raise HTTPException(422, "Check the name, a Riot ID like name#tag, the rank and the role")
+    if riot.lower() != p.riot_id_key and await db.scalar(select(Player.id).where(
+            Player.riot_id_key == riot.lower(), Player.id != p.id, Player.status.not_in(["rejected", "withdrawn"]))):
+        raise HTTPException(409, f"{riot} belongs to another player")
+    before = {"display_name": p.display_name, "riot_id": p.riot_id, "rank": p.current_rank_tier, "role": p.role}
+    if riot.lower() != p.riot_id_key:   # a different account: look it up again on the next scoreboard search
+        p.puuid = p.card_url = p.card_wide_url = None
+    p.display_name, p.riot_id, p.riot_id_key, p.current_rank_tier, p.role = name, riot, riot.lower(), rank, role
+    audit(db, admin, "player.edited", player_id=p.id, before=before,
+          after={"display_name": name, "riot_id": riot, "rank": rank, "role": role})
+    await db.commit()
+    publish("team.updated", player_id=p.id)
+    return {"id": p.id, "display_name": name, "riot_id": riot}
+
+
 @router.post("/players/{player_id}/switch-path")
 async def switch_path(player_id: int, db: AsyncSession = Depends(get_db), admin: str = Depends(require_admin)):
     """Auction player <-> sub. Only organisers can do this; players ask them."""
@@ -337,14 +367,16 @@ async def approve_waiting_captains(db: AsyncSession):
 @router.get("/rosters")
 async def rosters(db: AsyncSession = Depends(get_db), admin: str = Depends(require_admin)):
     """Each approved team's captain and bought players, plus who could replace someone who backs out."""
-    _, cfg = await load(db)
+    t, cfg = await load(db)
     card = lambda p: {"id": p.id, "display_name": p.display_name, "riot_id": p.riot_id, "role": p.role,  # noqa: E731
-                      "rank": cfg["ranks"][p.current_rank_tier - 1], "path": p.path}
+                      "rank": cfg["ranks"][p.current_rank_tier - 1], "tier": p.current_rank_tier, "path": p.path,
+                      "discord": p.discord, "tracker_url": cfg["tracker_url"].format(riot_id=quote(p.riot_id, safe=""))}
     sales, teams = await active_sales(db), await auction_teams(db)
     taken = {p.id for _, p in sales} | {leader.id for _, leader in teams}
     free = await db.scalars(select(Player).where(Player.status == "approved", Player.path != "leader",
                                                  Player.id.not_in(taken or {0})).order_by(Player.display_name))
-    return {"teams": {team.id: {"captain": card(leader), "players": [card(p) | {"price": sale.price}
+    return {"auction_status": t.status, "ranks": cfg["ranks"], "roles": cfg["roles"],
+            "teams": {team.id: {**team_card(team), "captain": card(leader), "players": [card(p) | {"price": sale.price}
                                                                      for sale, p in sales if sale.team_id == team.id]}
                       for team, leader in teams},
             "free": [card(p) for p in free]}

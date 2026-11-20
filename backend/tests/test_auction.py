@@ -308,3 +308,23 @@ async def test_admin_swaps_a_player_who_backed_out(c):
     assert sub["id"] in ids and out["id"] not in ids and out["id"] in [p["id"] for p in after["free"]]
     assert credits(await snap(c), 1) == before                                    # same price, same credits
     assert (await c.post("/api/v1/admin/teams/1/swap", json={})).status_code == 401
+
+
+async def test_admin_fixes_a_wrong_riot_id(c):
+    await seed(n_teams=2, n_players=2)
+    async with core.Session() as db:
+        p = await db.get(Player, 3)
+        p.puuid, p.card_url = "old-puuid", "old-card"
+        await db.commit()
+    edit = lambda pid, **b: c.post(f"/api/v1/admin/players/{pid}/edit", json=b, headers=c.admin)
+    assert (await edit(3, riot_id="not an id")).status_code == 422
+    assert (await edit(3, riot_id="Fixed#ZXB", display_name="Fixed", role="Sentinel")).status_code == 200
+    assert (await edit(4, riot_id="fixed#zxb")).status_code == 409               # someone else's (case-insensitive)
+    async with core.Session() as db:
+        p = await db.get(Player, 3)
+        assert (p.riot_id, p.riot_id_key, p.display_name, p.role, p.puuid, p.card_url) == \
+            ("Fixed#ZXB", "fixed#zxb", "Fixed", "Sentinel", None, None)   # re-resolved on the next scoreboard search
+    assert (await edit(3, display_name="Fixed again")).status_code == 200      # same Riot ID is fine
+    r = (await c.get("/api/v1/admin/rosters", headers=c.admin)).json()
+    assert r["teams"]["1"]["name"] and r["ranks"] and "tracker_url" in r["teams"]["1"]["captain"]
+    assert (await c.post("/api/v1/admin/players/3/edit", json={})).status_code == 401

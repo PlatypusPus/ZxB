@@ -295,6 +295,7 @@ input[aria-invalid=true], select[aria-invalid=true] { border-color: var(--danger
 .admin { padding: var(--t); }
 .admin-bar { display: flex; gap: var(--t); align-items: center; flex-wrap: wrap; margin-bottom: var(--t); }
 .admin-bar nav { display: flex; gap: 4px; flex: 1; }
+.admin-bar > :last-child { margin-left: auto; }
 .admin-bar nav button { font: 500 15px var(--body); background: transparent; color: var(--ink); border: 1px solid var(--line); padding: 8px 16px; cursor: pointer; }
 .admin-bar nav button.on { background: var(--pink); border-color: var(--pink); color: var(--base); }
 .toolbar { display: flex; gap: var(--t); align-items: center; margin-bottom: 12px; }
@@ -683,9 +684,17 @@ textarea:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
 .sb-admin-h { margin-top: calc(var(--t) * 2); }
 .sb-acts { padding: 12px var(--t) 0; }
 .sb-side .muted { margin-left: 6px; }
-.roster { margin-top: var(--t); border-top: 1px solid var(--line); padding-top: 12px; }
-.roster ul { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 8px; }
-.roster li { display: grid; gap: 6px; padding: 8px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
-.roster li .btn { min-height: 34px; padding: 4px 12px; font-size: 13px; justify-self: start; }
-.roster .swap { display: grid; gap: 6px; }
-.roster .swap select { width: 100%; }
+.tp { max-width: 960px; }
+.tp-head { display: flex; gap: var(--t); align-items: center; margin-bottom: var(--t); }
+.tp-head .logo { width: 88px; height: 88px; margin: 0; }
+.tp-head h1 { font-size: clamp(32px, 5vw, 56px); margin: 0; }
+.tp-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.tp-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; padding: 14px var(--t); background: var(--tile); border: 1px solid var(--line); }
+.tp-row.on { border-color: var(--amber); }
+.tp-who { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; min-width: 0; }
+.tp-who .muted { flex-basis: 100%; overflow-wrap: anywhere; }
+.tp-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.tp-form { flex-basis: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 12px; align-items: end; }
+.tp-form label { display: grid; gap: 6px; }
+.tp-form .tp-note, .tp-form .tp-acts { grid-column: 1 / -1; margin: 0; }
+.tp-form .tp-wide { grid-column: 1 / -1; max-width: 32rem; }

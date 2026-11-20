@@ -36,7 +36,7 @@ export function Nav({ info }) {
   const done = stage(info)
   const live = info?.status === 'auction_live' || info?.status === 'auction_paused'
   const chip = live ? 'AUCTION LIVE' : done || (info?.registration_open ? 'SIGN-UPS OPEN' : info ? 'SIGN-UPS CLOSED' : '…')
-  const cta = live ? ['/projector', 'Watch live'] : user ? ['/profile', 'My profile'] : done ? ['/scoreboard', 'Scoreboard'] : ['/signup', 'Sign up']
+  const cta = live ? ['/projector', 'Watch live'] : user ? ['/profile', 'My profile'] : done ? ['/profile', 'Sign in'] : ['/signup', 'Sign up']
   return (
     <header className={'nav' + (scrolled ? ' scrolled' : '') + (open ? ' open' : '')}>
       <div className="nav-inner wrap">

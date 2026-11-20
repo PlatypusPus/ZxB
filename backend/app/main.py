@@ -14,6 +14,7 @@ from .modules.admin.router import approve_waiting_captains, router as admin_rout
 from .modules.auction import service as auction
 from .modules.auction.router import router as auction_router, timer_loop
 from .modules.auth import router as auth_router
+from .modules.scoreboard.router import router as scoreboard_router
 from .modules.signup.router import router as signup_router
 from .tournament import init_db
 
@@ -54,7 +55,7 @@ async def cap_body(request: Request, call_next):
     return await call_next(request)
 
 
-for r in (signup_router, admin_router, auction_router, auth_router):
+for r in (signup_router, admin_router, auction_router, auth_router, scoreboard_router):
     app.include_router(r, prefix="/api/v1")
 
 

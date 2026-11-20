@@ -8,9 +8,10 @@ import Admin from './Admin.jsx'
 import Projector from './Projector.jsx'
 import Leader from './Leader.jsx'
 import Policy from './Policy.jsx'
+import Scoreboard from './Scoreboard.jsx'
 import { NotFound, Verified } from './Pages.jsx'
 
-// ponytail: nine routes, so a pathname switch instead of a router library.
+// ponytail: ten routes, so a pathname switch instead of a router library.
 const path = location.pathname.replace(/\/+$/, '') || '/'
 const page = path === '/draft' || path === '/auction' ? <Draft />
   : path.startsWith('/signup') ? <Signup />
@@ -18,6 +19,7 @@ const page = path === '/draft' || path === '/auction' ? <Draft />
   : path === '/profile' ? <Profile />
   : path.startsWith('/admin') ? <Admin />
   : path === '/projector' ? <Projector />
+  : path === '/scoreboard' ? <Scoreboard />
   : path === '/refund-policy' ? <Policy kind="refund" />
   : path === '/privacy' ? <Policy kind="privacy" />
   : path === '/terms' ? <Policy kind="terms" />
@@ -35,6 +37,7 @@ const META = {
   '/refund-policy': ['Refund policy · ZenithXBeans', 'Entry fees are not refunded, but you can swap your place with another player.'],
   '/privacy': ['Privacy · ZenithXBeans', 'What ZenithXBeans collects when you register, and who can see it.'],
   '/terms': ['Terms of service · ZenithXBeans', 'The terms for using zxb.shov.in and taking part in ZenithXBeans tournaments.'],
+  '/scoreboard': ['Scoreboard · ZenithXBeans Valorant Auction', 'Group stage standings, role leaders and full match scoreboards for the ZenithXBeans Valorant Auction.'],
   '/verified': ['Email verified · ZenithXBeans', 'Your email is verified.'],
 }
 const canon = path === '/auction' ? '/draft' : path

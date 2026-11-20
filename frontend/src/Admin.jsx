@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { api } from './api.js'
 import { useAuction, useCountdown } from './live.js'
+import { MatchSummary, MatchTable } from './Scoreboard.jsx'
 
-const TABS = ['Queue', 'Teams', 'Live', 'Settings', 'Email', 'Payments', 'Audit']
+const TABS = ['Queue', 'Teams', 'Live', 'Scoreboard', 'Settings', 'Email', 'Payments', 'Audit']
 const PATH = { leader: 'Captain', auction: 'Auction player', sub: 'Sub (free)' }
 
 export default function Admin() {
@@ -21,6 +22,7 @@ export default function Admin() {
       {tab === 'Queue' && <Queue call={call} token={token} />}
       {tab === 'Teams' && <Teams call={call} />}
       {tab === 'Live' && <Live call={call} token={token} />}
+      {tab === 'Scoreboard' && <ScoreboardAdmin call={call} />}
       {tab === 'Settings' && <Settings call={call} />}
       {tab === 'Email' && <Announce call={call} />}
       {tab === 'Payments' && <Payments token={token} />}
@@ -514,6 +516,113 @@ function Live({ call, token }) {
         {!snap.teams.length && <p className="muted empty-row">No teams yet. Approve captains in the Queue tab and their teams show up here.</p>}
       </div>
       {snap.recent.length > 0 && <p className="muted small">Last sales: {snap.recent.map(r => `${r.player} → ${r.team} ${r.price}`).join(' · ')}</p>}
+    </section>
+  )
+}
+
+const MAPS = ['Abyss', 'Ascent', 'Bind', 'Breeze', 'Corrode', 'Fracture', 'Haven', 'Icebox', 'Lotus', 'Pearl', 'Split', 'Sunset']
+
+// Pick two teams (fix the lineup if someone was subbed), find their custom game in Henrik, import it, then publish.
+function ScoreboardAdmin({ call }) {
+  const [data, setData] = useState(null)
+  const [flash, setFlash] = useState('')
+  const [pick, setPick] = useState({ a: '', b: '', map: '' })
+  const [lineup, setLineup] = useState({ a: [], b: [] })   // player ids per side
+  const [found, setFound] = useState(null)
+  const [busy, setBusy] = useState('')
+  const [sure, setSure] = useState(null)
+  const load = () => call('/admin/scoreboard').then(setData).catch(e => setFlash(e.message))
+  useEffect(() => { load() }, [])
+  if (!data) return <section>{flash ? <p className="flash">{flash}</p> : <p className="muted">Loading…</p>}</section>
+
+  const team = id => data.teams.find(t => t.id === +id)
+  const person = id => data.players.find(p => p.id === id) || data.teams.flatMap(t => t.players).find(p => p.id === id)
+  const choose = (side, id) => {
+    setPick({ ...pick, [side]: id }); setFound(null)
+    setLineup({ ...lineup, [side]: team(id)?.players.map(p => p.id) || [] })
+  }
+  const used = new Set([...lineup.a, ...lineup.b])
+  const body = () => ({ team_a: +pick.a, team_b: +pick.b, players_a: lineup.a, players_b: lineup.b, map: pick.map })
+  const run = async (label, fn) => {
+    setBusy(label); setFlash('')
+    try { await fn() } catch (e) { setFlash(e.message) } finally { setBusy('') }
+  }
+  const search = () => run('search', async () => setFound(await call('/admin/scoreboard/search', { method: 'POST', body: body() })))
+  const importIt = id => run(id, async () => {
+    const r = await call('/admin/scoreboard/import', { method: 'POST', body: { ...body(), match_id: id } })
+    setFlash(`Imported ${r.map || 'map'} ${r.rounds_a}–${r.rounds_b}. Check the scoreboard below, then publish it.`)
+    setFound(null); load()
+  })
+  const act = (m, what) => run(m.id + what, async () => {
+    await call(`/admin/scoreboard/matches/${m.id}/${what}`, { method: 'POST', body: {} })
+    setSure(null); load()
+  })
+
+  const side = s => (
+    <div className="card sb-pick" key={s}>
+      <label>{s === 'a' ? 'Team A' : 'Team B'} <select value={pick[s]} onChange={e => choose(s, e.target.value)}>
+        <option value="">Choose a team</option>
+        {data.teams.map(t => <option key={t.id} value={t.id} disabled={String(t.id) === pick[s === 'a' ? 'b' : 'a']}>{t.name} [{t.tag}]</option>)}
+      </select></label>
+      {pick[s] && <>
+        <p className="mono muted">LINEUP · {lineup[s].length} {lineup[s].length === 1 ? 'PLAYER' : 'PLAYERS'}</p>
+        <ul className="sb-chips">{lineup[s].map(id => {
+          const p = person(id)
+          return <li key={id}>{p?.display_name} <span className="muted small">{p?.riot_id}</span>
+            <button className="btn ghost" aria-label={`Remove ${p?.display_name}`} onClick={() => setLineup({ ...lineup, [s]: lineup[s].filter(x => x !== id) })}>×</button></li>
+        })}</ul>
+        <label>Add a stand-in <select value="" onChange={e => e.target.value && setLineup({ ...lineup, [s]: [...lineup[s], +e.target.value] })}>
+          <option value="">Choose a player or sub</option>
+          {data.players.filter(p => !used.has(p.id)).map(p => <option key={p.id} value={p.id}>{p.display_name} · {p.riot_id} · {p.path === 'sub' ? 'sub' : p.role}</option>)}
+        </select></label>
+      </>}
+    </div>
+  )
+
+  return (
+    <section>
+      {!data.configured && <p className="err" role="alert">The Henrik API key isn't set on the server (HENRIKDEV_API_KEY), so searches will fail.</p>}
+      <p>Pick the two teams that played. If someone was subbed, remove them and add the stand-in. The search reads the players' recent custom games and only shows matches that players from both teams were in.</p>
+      <div className="sb-picks">{side('a')}{side('b')}</div>
+      <div className="toolbar">
+        <label>Map <select value={pick.map} onChange={e => { setPick({ ...pick, map: e.target.value }); setFound(null) }}>
+          <option value="">Any map</option>{MAPS.map(m => <option key={m}>{m}</option>)}</select></label>
+        <button className="btn" disabled={!pick.a || !pick.b || !lineup.a.length || !lineup.b.length || !!busy} onClick={search}>
+          {busy === 'search' ? 'Searching Henrik… (about 15 s)' : 'Find match'}</button>
+      </div>
+      {flash && <p className="flash" role="status">{flash}</p>}
+      {found && <div className="card">
+        {found.missing?.length > 0 && <p className="err">These Riot IDs weren't found, so they were skipped: {found.missing.join(', ')}</p>}
+        {found.note && <p className="err">{found.note}</p>}
+        <p className="mono muted">{found.candidates.length} MATCH{found.candidates.length === 1 ? '' : 'ES'} FOUND · {found.calls} HISTORY LOOKUPS</p>
+        {found.candidates.length === 0 && <p>No custom game with players from both teams in their last 10 customs{pick.map ? ` on ${pick.map}` : ''}. Check the lineups and try again after the match has finished.</p>}
+        <ul className="sb-found">{found.candidates.map(c => (
+          <li key={c.match_id}>
+            <span><strong>{c.map || 'Unknown map'}</strong> · {c.started_at ? new Date(c.started_at).toLocaleString('en-IN') : 'time unknown'}
+              <br /><span className="muted small">Seen from {c.a_hits} {team(pick.a)?.tag} and {c.b_hits} {team(pick.b)?.tag} players · {c.match_id}</span></span>
+            {c.imported === 'published' ? <span className="tag ghost">Published</span>
+              : <button className="btn" disabled={!!busy} onClick={() => importIt(c.match_id)}>{busy === c.match_id ? 'Importing…' : c.imported ? 'Re-import' : 'Import'}</button>}
+          </li>
+        ))}</ul>
+      </div>}
+
+      <h3 className="display sb-admin-h">Imported matches</h3>
+      {data.matches.length === 0 && <p className="muted">Nothing imported yet.</p>}
+      {data.matches.map(m => (
+        <details className="card sb-game" key={m.id}>
+          <summary><MatchSummary m={m} /> <span className={'tag' + (m.status === 'published' ? '' : ' ghost')}>{m.status === 'published' ? 'Published' : 'Not public yet'}</span></summary>
+          <div className="toolbar sb-acts">
+            {m.status === 'published'
+              ? <button className="btn ghost" disabled={!!busy} onClick={() => act(m, 'unpublish')}>Unpublish</button>
+              : <button className="btn" disabled={!!busy} onClick={() => act(m, 'publish')}>Publish</button>}
+            {sure === m.id
+              ? <><button className="btn danger" onClick={() => act(m, 'delete')}>Delete for good</button><button className="btn ghost" onClick={() => setSure(null)}>Keep</button></>
+              : <button className="btn ghost" onClick={() => setSure(m.id)}>Delete</button>}
+            <a className="btn ghost" href="/scoreboard" target="_blank" rel="noreferrer">Open public page</a>
+          </div>
+          <MatchTable match={m} />
+        </details>
+      ))}
     </section>
   )
 }

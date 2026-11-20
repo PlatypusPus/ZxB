@@ -52,6 +52,9 @@ class Player(Base):
     display_name: Mapped[str] = mapped_column(String(32))
     riot_id: Mapped[str] = mapped_column(String(24))
     riot_id_key: Mapped[str] = mapped_column(String(24))  # lowercased
+    puuid: Mapped[str | None] = mapped_column(String(80), index=True)   # Riot account id, resolved via Henrik
+    card_url: Mapped[str | None] = mapped_column(String(200))           # Valorant player card art (portrait)
+    card_wide_url: Mapped[str | None] = mapped_column(String(200))
     current_rank_tier: Mapped[int] = mapped_column(Integer)
     peak_rank_tier: Mapped[int] = mapped_column(Integer)
     role: Mapped[str] = mapped_column(String(16))
@@ -171,3 +174,41 @@ class Account(Base):
     password_hash: Mapped[str] = mapped_column(String(200))
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = created()
+
+
+class GameMatch(Base):
+    """A tournament map found in Henrik (custom game) and imported by an organiser. Public once published."""
+    __tablename__ = "game_match"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tournament_id: Mapped[int] = tournament_fk()
+    henrik_match_id: Mapped[str] = mapped_column(String(64), unique=True)
+    map: Mapped[str | None] = mapped_column(String(32))
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    team_a_id: Mapped[int] = mapped_column(ForeignKey("team.id"))
+    team_b_id: Mapped[int] = mapped_column(ForeignKey("team.id"))
+    rounds_a: Mapped[int] = mapped_column(Integer, default=0)
+    rounds_b: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(10), default="candidate")  # candidate | published
+    created_at: Mapped[datetime] = created()
+
+
+class GameMatchPlayer(Base):
+    __tablename__ = "game_match_player"
+    __table_args__ = (UniqueConstraint("match_id", "puuid", name="uq_match_player"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    match_id: Mapped[int] = mapped_column(ForeignKey("game_match.id", ondelete="CASCADE"), index=True)
+    team_id: Mapped[int | None] = mapped_column(ForeignKey("team.id"))
+    player_id: Mapped[int | None] = mapped_column(ForeignKey("player.id"))   # None: someone not signed up here
+    puuid: Mapped[str] = mapped_column(String(80))
+    riot_id: Mapped[str] = mapped_column(String(40))
+    agent: Mapped[str | None] = mapped_column(String(24))
+    kills: Mapped[int] = mapped_column(Integer, default=0)
+    deaths: Mapped[int] = mapped_column(Integer, default=0)
+    assists: Mapped[int] = mapped_column(Integer, default=0)
+    score: Mapped[int] = mapped_column(Integer, default=0)
+    damage: Mapped[int] = mapped_column(Integer, default=0)
+    headshots: Mapped[int] = mapped_column(Integer, default=0)
+    bodyshots: Mapped[int] = mapped_column(Integer, default=0)
+    legshots: Mapped[int] = mapped_column(Integer, default=0)
+    first_kills: Mapped[int] = mapped_column(Integer, default=0)
+    first_deaths: Mapped[int] = mapped_column(Integer, default=0)

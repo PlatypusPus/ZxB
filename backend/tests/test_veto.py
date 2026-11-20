@@ -71,3 +71,32 @@ async def test_veto_from_coin_toss_to_side(c):
     lst = (await c.get("/api/v1/admin/vetoes", headers=c.admin)).json()
     assert lst["last_pool"] == POOL and len(lst["vetoes"]) == 1 and lst["teams"][0]["has_account"] is True
     assert (await c.get("/api/v1/admin/vetoes")).status_code == 401
+
+
+async def test_veto_link_for_a_stand_in(c):
+    await seed(n_teams=2, n_players=0)
+    a = await sign_in(c, 1)
+    vid = (await c.post("/api/v1/admin/vetoes", headers=c.admin, json={"team_a": 1, "team_b": 2, "pool": POOL})).json()["id"]
+    link = lambda team, player: c.post(f"/api/v1/admin/vetoes/{vid}/link", headers=c.admin,  # noqa: E731
+                                       json={"team_id": team, "player_id": player})
+    assert (await link(2, 1)).status_code == 422            # player 1 is team 1's captain, not on team 2
+    assert (await link(3, 2)).status_code == 422            # team 3 isn't in this veto
+    r = (await link(2, 2)).json()
+    key = r["link"].split("?k=")[1]
+    assert r["delegate"] == "P1" and f"/veto/{vid}?k=" in r["link"]
+
+    s = (await c.get(f"/api/v1/vetoes/{vid}?k={key}")).json()
+    assert s["you"] == 2 and s["team_b"]["delegate"] == "P1"
+    assert (await c.get(f"/api/v1/vetoes/{vid}?k=wrong")).json()["you"] is None
+    move = lambda action, value, k="", who=None: c.post(f"/api/v1/vetoes/{vid}/{action}?k={k}", json={"value": value}, cookies=who)  # noqa: E731
+    assert (await move("call", "heads", key)).status_code == 409    # the link is team B's; A calls
+    s = (await move("call", "heads", who=a)).json()
+    first = s["first_team_id"]
+    turn = {1: dict(who=a), 2: dict(k=key)}
+    assert (await move("ban", "Ascent", **turn[first])).status_code == 200
+    assert (await move("ban", "Bind", **turn[3 - first])).status_code == 200
+
+    new = (await link(2, 2)).json()["link"].split("?k=")[1]          # a new link revokes the old one
+    assert (await c.get(f"/api/v1/vetoes/{vid}?k={key}")).json()["you"] is None
+    assert (await c.get(f"/api/v1/vetoes/{vid}?k={new}")).json()["you"] == 2
+    assert (await c.post(f"/api/v1/admin/vetoes/{vid}/link", json={"team_id": 2, "player_id": 2})).status_code == 401

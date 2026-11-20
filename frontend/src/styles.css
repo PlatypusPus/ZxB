@@ -785,3 +785,4 @@ h1.display.vt-head { font-size: clamp(32px, 4.5vw, 56px); margin: 0 0 var(--t); 
 .vt-list li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; padding: 14px var(--t); background: var(--tile); border: 1px solid var(--line); }
 .sb-from { display: grid; gap: 6px; max-width: 32rem; margin-bottom: var(--t); }
 @media (max-width: 600px) { .vt-teams { grid-template-columns: 1fr; } }
+.sched-lede { margin: -8px 0 var(--t); }

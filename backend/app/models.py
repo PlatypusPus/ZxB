@@ -231,4 +231,9 @@ class Veto(Base):
     map: Mapped[str | None] = mapped_column(String(32))
     side_team_id: Mapped[int | None] = mapped_column(Integer)
     side: Mapped[str | None] = mapped_column(String(8))                # attack | defense
+    # A team member the organiser handed a veto link to (captain away). Link = /veto/<id>?k=<key>; only the hash is kept.
+    a_key_hash: Mapped[str | None] = mapped_column(String(64))
+    b_key_hash: Mapped[str | None] = mapped_column(String(64))
+    a_delegate: Mapped[str | None] = mapped_column(String(32))
+    b_delegate: Mapped[str | None] = mapped_column(String(32))
     created_at: Mapped[datetime] = created()

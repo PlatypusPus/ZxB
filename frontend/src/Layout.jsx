@@ -102,15 +102,18 @@ const Match = ({ title, a, b }) => (
 // Every date comes from Admin -> Settings; playoff dates are TBA until they're scheduled.
 export function Schedule({ info, done }) {
   const auction = parseDay(info?.event_date), g1 = parseDay(info?.group_start), g2 = parseDay(info?.group_end)
-  const tba = ['TBA', 'DATE'], size = info?.teams ? info.teams / 2 : 6
+  const size = info?.teams ? info.teams / 2 : 6
+  // During the group stage the playoffs have no dates yet: show their order instead of a row of TBAs.
+  let step = 1
+  const tba = () => done ? [String(++step).padStart(2, '0'), step === 2 ? 'AFTER GROUPS' : 'THEN'] : ['TBA', 'DATE']
   const rows = [
     !done && [...dayCell(auction), 'Auction', 'Captains bid on registered players. Unsold players go again at half price.', ''],
-    [...spanCell(g1, g2), 'Group stage', `${info?.teams ?? 12} teams in 2 groups of ${size}, single round robin.`, 'BO1'],
-    [...tba, 'Play-in', 'A3 vs B4 and B3 vs A4, single elimination. Winners go to the lower bracket.', 'BO3'],
-    [...tba, 'Upper semifinals', 'A1 vs B2 and B1 vs A2.', 'BO3'],
-    [...tba, 'Lower round 1', 'Play-in winners vs the upper semifinal losers.', 'BO3'],
-    [...tba, 'Upper final + lower final', '', 'BO3'],
-    [...tba, 'Grand final', '', 'BO5'],
+    [...spanCell(g1, g2), 'Group stage', `${info?.teams ?? 12} teams in 2 groups of ${size}, single round robin: each team plays ${size - 1} matches, ${size * (size - 1)} in all.`, 'BO1'],
+    [...tba(), 'Play-in', 'A3 vs B4 and B3 vs A4, single elimination. Winners go to the lower bracket.', 'BO3'],
+    [...tba(), 'Upper semifinals', 'A1 vs B2 and B1 vs A2.', 'BO3'],
+    [...tba(), 'Lower round 1', 'Play-in winners vs the upper semifinal losers.', 'BO3'],
+    [...tba(), 'Upper final + lower final', '', 'BO3'],
+    [...tba(), 'Grand final', '', 'BO5'],
   ].filter(Boolean)
   return (
     <>

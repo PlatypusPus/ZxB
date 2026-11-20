@@ -3,6 +3,9 @@ import { api } from './api.js'
 import { Footer, Nav } from './Layout.jsx'
 
 const FLIP_MS = 1600
+// A stand-in's link: /veto/<id>?k=<key> makes moves for that team without an account.
+const key = new URLSearchParams(location.search).get('k')
+const q = key ? `?k=${encodeURIComponent(key)}` : ''
 const Logo = ({ team }) => team?.logo_url ? <img className="vt-logo" src={team.logo_url} alt="" /> : null
 
 // A map tile with its preview. state: in | off (admin pool), gone (banned), picked, sel (about to be banned).
@@ -45,7 +48,7 @@ export default function Veto({ id }) {
     seen.current = s.coin
     setV(s)
   }
-  const load = () => api(`/vetoes/${id}`).then(take).catch(e => setErr(e.message))
+  const load = () => api(`/vetoes/${id}${q}`).then(take).catch(e => setErr(e.message))
   useEffect(() => { api('/public').then(setInfo).catch(() => {}); load() }, [id])
   // ponytail: polls every 1.5 s while live; switch to the WebSocket hub if many people watch at once
   useEffect(() => {
@@ -56,7 +59,7 @@ export default function Veto({ id }) {
 
   const send = async (action, value) => {
     setBusy(true); setErr('')
-    try { take(await api(`/vetoes/${id}/${action}`, { method: 'POST', body: { value } })); setPick('') }
+    try { take(await api(`/vetoes/${id}/${action}${q}`, { method: 'POST', body: { value } })); setPick('') }
     catch (e) { setErr(e.message); load() } finally { setBusy(false) }
   }
 
@@ -83,13 +86,14 @@ export default function Veto({ id }) {
           {[v.team_a, v.team_b].map(t => (
             <div key={t?.id} className={'vt-team' + (v.turn === t?.id && revealed ? ' on' : '')}>
               <Logo team={t} />
-              <div><strong>{t?.name}</strong><span className="muted small">Captain {t?.captain}{v.you === t?.id ? ' · you' : ''}</span></div>
+              <div><strong>{t?.name}</strong><span className="muted small">{t?.delegate ? `Vetoing: ${t.delegate}` : `Captain ${t?.captain}`}{v.you === t?.id ? ' · you' : ''}</span></div>
             </div>
           ))}
         </header>
 
         <h1 className="display vt-head" aria-live="polite">{headline}</h1>
         {err && <p className="err" role="alert">{err}</p>}
+        {key && !v.you && <p className="err">This veto link has been replaced. Ask the organiser for the new one.</p>}
 
         {(v.status === 'coin' || v.coin) && (
           <section className="vt-coin">
@@ -131,7 +135,7 @@ export default function Veto({ id }) {
           </section>
         )}
 
-        {!v.you && v.status !== 'done' && <p className="muted small vt-note">Captains: <a href="/profile">sign in</a> with the account you signed up with to make your moves. Everyone else can watch here.</p>}
+        {!v.you && !key && v.status !== 'done' && <p className="muted small vt-note">Captains: <a href="/profile">sign in</a> with the account you signed up with to make your moves. Everyone else can watch here.</p>}
       </main>
       <Footer />
     </>

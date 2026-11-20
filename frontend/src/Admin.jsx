@@ -626,6 +626,7 @@ function VetoAdmin({ call }) {
   const [flash, setFlash] = useState('')
   const [form, setForm] = useState({ a: '', b: '', pool: null })
   const [sure, setSure] = useState(null)
+  const [stand, setStand] = useState({})   // veto id -> picked player id for a stand-in link
   const load = () => call('/admin/vetoes').then(setData).catch(e => setFlash(e.message))
   useEffect(() => { load() }, [])
   // ponytail: refresh every 5 s so the list follows the captains' moves
@@ -677,11 +678,26 @@ function VetoAdmin({ call }) {
       <ul className="vt-list">{data.vetoes.map(v => (
         <li key={v.id}>
           <span><strong>{v.team_a?.name} vs {v.team_b?.name}</strong><br />
-            <span className="muted small">{VETO_STATUS[v.status]}{v.map ? ` · ${v.map}` : ''}{v.side ? ` · ${data.teams.find(t => t.id === v.side_team_id)?.tag} on ${v.side}` : ''}</span></span>
+            <span className="muted small">{VETO_STATUS[v.status]}{v.map ? ` · ${v.map}` : ''}{v.side ? ` · ${data.teams.find(t => t.id === v.side_team_id)?.tag} on ${v.side}` : ''}{[v.team_a, v.team_b].filter(t => t?.delegate).map(t => ` · ${t.delegate} vetoes for ${t.tag}`).join('')}</span></span>
           <span className="tp-acts">
             <a className="btn ghost" href={`/veto/${v.id}`} target="_blank" rel="noreferrer">Open</a>
             <button className="btn ghost" onClick={() => navigator.clipboard?.writeText(link(v.id)).then(() => setFlash(`Copied ${link(v.id)}`))}>Copy link</button>
             {v.status !== 'coin' && <button className="btn ghost" onClick={() => post(`/admin/vetoes/${v.id}/reset`, {}, () => 'Veto restarted from the coin toss.')}>Restart</button>}
+            {v.status !== 'done' && <select aria-label="Give the veto link to someone else on the team" value={stand[v.id] || ''}
+              onChange={e => setStand({ ...stand, [v.id]: e.target.value })}>
+              <option value="">Captain away? Give the link to…</option>
+              {[v.team_a, v.team_b].map(t => t && <optgroup key={t.id} label={t.name}>
+                {team(t.id)?.players.map(p => <option key={p.id} value={`${t.id}:${p.id}`}>{p.display_name}{p.captain ? ' (captain)' : ''}</option>)}
+              </optgroup>)}
+            </select>}
+            {stand[v.id] && <button className="btn" onClick={() => {
+              const [t, p] = stand[v.id].split(':')
+              post(`/admin/vetoes/${v.id}/link`, { team_id: +t, player_id: +p }, r => {
+                navigator.clipboard?.writeText(r.link)
+                setStand({ ...stand, [v.id]: '' })
+                return `Link for ${r.delegate} copied: ${r.link} . Anyone with it vetoes for ${team(t)?.name}; making a new one cancels the old one.`
+              })
+            }}>Make link</button>}
             {sure === v.id
               ? <><button className="btn danger" onClick={() => post(`/admin/vetoes/${v.id}/delete`, {}, () => 'Veto deleted.')}>Delete for good</button><button className="btn ghost" onClick={() => setSure(null)}>Keep</button></>
               : <button className="btn ghost" onClick={() => setSure(v.id)}>Delete</button>}

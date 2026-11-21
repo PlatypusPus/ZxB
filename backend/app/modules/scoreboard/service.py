@@ -20,19 +20,6 @@ from . import henrik
 ROLES = ["Duelist", "Initiator", "Controller", "Sentinel", "Flex"]
 WIN, CLOSE_LOSS, LOSS = 3, 1, 0
 CLOSE_MARGIN = 3        # losing by this many rounds or fewer still earns CLOSE_LOSS
-PRIOR_GAMES = 2         # Bayesian tempering: a 1-map spike is pulled toward the role average
-MIN_GAMES = 1           # round robin is one map per pairing, so everyone who played counts
-
-# Weights per role pool (from NTG's award model). Each metric is a 0-100 percentile within the pool.
-WEIGHTS = {
-    "Duelist": {"acs": .50, "fk_diff": .25, "adr": .15, "kast": .10},
-    "Initiator": {"assists": .35, "acs": .35, "kast": .20, "adr": .10},
-    "Controller": {"acs": .40, "kast": .25, "assists": .20, "adr": .15},
-    "Sentinel": {"acs": .45, "kast": .25, "kd": .20, "adr": .10},
-    "Flex": {"acs": .55, "adr": .15, "kd": .15, "fk_diff": .15},
-}
-HEADLINE = {"Duelist": ("FIRST KILLS", "first_kills"), "Initiator": ("ASSISTS", "assists"),
-            "Controller": ("KAST", "kast"), "Sentinel": ("KAST", "kast"), "Flex": ("ACS", "acs")}
 
 
 # ---------- pure helpers (unit tested without the network)
@@ -118,7 +105,8 @@ def points(rounds_for: int, rounds_against: int) -> int:
 
 
 def standings(teams: list[dict], matches: list[dict]) -> list[dict]:
-    """teams: {id, ...}; matches: {team_a_id, team_b_id, rounds_a, rounds_b}. Points -> RD -> RW -> head-to-head."""
+    """teams: {id, ...}; matches: {team_a_id, team_b_id, rounds_a, rounds_b}. Points -> RD -> RW -> head-to-head.
+    Teams yet to play go last, so a team that has played is never ranked below one that hasn't."""
     table = {t["id"]: {**t, "p": 0, "w": 0, "l": 0, "rw": 0, "rl": 0, "rd": 0, "pts": 0} for t in teams}
     beat: set[tuple[int, int]] = set()
     for m in matches:
@@ -138,7 +126,7 @@ def standings(teams: list[dict], matches: list[dict]) -> list[dict]:
                 row["l"] += 1
     for row in table.values():
         row["rd"] = row["rw"] - row["rl"]
-    out = sorted(table.values(), key=lambda r: (-r["pts"], -r["rd"], -r["rw"], r["name"].lower()))
+    out = sorted(table.values(), key=lambda r: (r["p"] == 0, -r["pts"], -r["rd"], -r["rw"], r["name"].lower()))
     # ponytail: head-to-head only settles two-way ties; a three-way tie stays in RD/RW/name order
     for i in range(len(out) - 1):
         x, y = out[i], out[i + 1]
@@ -162,64 +150,30 @@ def aggregate(rows: list[dict]) -> dict:
                   "first_kills", "first_deaths"):
             a[k] += r[k]
     for a in agg.values():
-        rounds, games = max(1, a["rounds"]), max(1, a["games"])
+        rounds = max(1, a["rounds"])
         shots = a["headshots"] + a["bodyshots"] + a["legshots"]
         a["acs"] = round(a["score"] / rounds)
         a["adr"] = round(a["damage"] / rounds)
         a["kd"] = round(a["kills"] / a["deaths"], 2) if a["deaths"] else float(a["kills"])
         a["hs"] = round(100 * a["headshots"] / shots, 1) if shots else 0.0
-        # ponytail: KAST proxy from totals (no per-round survival stored): (K + A + rounds survived) / (3 x rounds)
-        a["kast"] = round(min(100.0, 100 * (a["kills"] + a["assists"] + max(0, rounds - a["deaths"])) / (3 * rounds)), 1)
-        a["fk_diff"] = (a["first_kills"] - a["first_deaths"]) / games
-        a["assists_pg"] = a["assists"] / games
     return agg
 
 
-def _percentiles(values: list[float]) -> list[float]:
-    n = len(values)
-    if n == 1:
-        return [50.0]
-    order = sorted(range(n), key=lambda i: values[i])
-    out = [0.0] * n
-    i = 0
-    while i < n:
-        j = i
-        while j + 1 < n and values[order[j + 1]] == values[order[i]]:
-            j += 1
-        for k in range(i, j + 1):
-            out[order[k]] = (i + j) / 2 / (n - 1) * 100   # mid-rank for ties
-        i = j + 1
-    return out
+def min_maps(stats: list[dict]) -> int:
+    """Maps needed to be ranked: half of what the busiest player has played, so one hot map can't top the board."""
+    return (max((s["games"] for s in stats), default=0) + 1) // 2
 
 
-def rank_pool(players: list[dict], weights: dict[str, float]) -> list[dict]:
-    """Weighted percentile score within the pool, tempered toward the pool mean by games played."""
-    pool = [p for p in players if p["games"] >= MIN_GAMES]
-    if not pool:
-        return []
-    metric = {"assists": "assists_pg"}
-    cols = {k: [p[metric.get(k, k)] for p in pool] for k in weights}
-    live = {k: w for k, w in weights.items() if any(cols[k])}   # drop metrics with no signal at all
-    total = sum(live.values()) or 1
-    pct = {k: _percentiles(cols[k]) for k in live}
-    raw = [sum(w / total * pct[k][i] for k, w in live.items()) for i in range(len(pool))]
-    mean = sum(raw) / len(raw)
-    scored = [{**p, "score_raw": raw[i], "score": (p["games"] * raw[i] + PRIOR_GAMES * mean) / (p["games"] + PRIOR_GAMES)}
-              for i, p in enumerate(pool)]
-    return sorted(scored, key=lambda p: (-p["score"], -p["score_raw"], -p["games"], -p["acs"]))
+def rank_players(stats: list[dict]) -> list[dict]:
+    """Ranked by ACS (K/D breaks ties). Players short of the minimum maps are listed after, unranked."""
+    need = min_maps(stats)
+    return sorted(({**s, "ranked": s["games"] >= need} for s in stats), key=lambda s: (not s["ranked"], -s["acs"], -s["kd"]))
 
 
 def role_leaders(stats: list[dict]) -> list[dict]:
-    """stats rows carry 'role' (the role they signed up with). Best player per role."""
-    out = []
-    for role in ROLES:
-        ranked = rank_pool([s for s in stats if s.get("role") == role], WEIGHTS[role])
-        if ranked:
-            label, key = HEADLINE[role]
-            best = ranked[0]
-            value = f"{best[key]}%" if key == "kast" else best[key]
-            out.append({"role": role, "stat_label": label, "stat_value": value, **best})
-    return out
+    """stats rows carry 'role' (the role they signed up with). The top ranked player in each role."""
+    ranked = [s for s in rank_players(stats) if s["ranked"]]
+    return [{"role": role, **best} for role in ROLES if (best := next((s for s in ranked if s.get("role") == role), None))]
 
 
 # ---------- database side
@@ -373,13 +327,15 @@ async def board(db: AsyncSession, published_only: bool = True) -> dict:
         s.update(role=p.role, display_name=p.display_name, riot_id=p.riot_id, card_url=p.card_url,
                  card_wide_url=p.card_wide_url, agents=dict(s["agents"]),
                  team=team_card(teams[last_team[s["key"]]]) if last_team.get(s["key"]) in teams else None)
-    leaders = [{k: v for k, v in l.items() if k in (
-        "role", "stat_label", "stat_value", "display_name", "riot_id", "card_url", "card_wide_url", "team", "games",
-        "acs", "kd", "kast")} for l in role_leaders(stats)]
+    public = ("display_name", "riot_id", "role", "team", "games", "acs", "kd", "adr", "hs", "kills", "deaths", "assists",
+              "first_kills", "first_deaths")
+    leaders = [{k: l[k] for k in ("role", "display_name", "riot_id", "card_url", "team", "games", "acs", "kd")}
+               for l in role_leaders(stats)]
+    players = [{"id": p["key"], "ranked": p["ranked"], **{k: p[k] for k in public}} for p in rank_players(stats)]
     cards = [team_card(t) for t in approved.values()]
     games = [{"team_a_id": m.team_a_id, "team_b_id": m.team_b_id, "rounds_a": m.rounds_a, "rounds_b": m.rounds_b}
              for m in published]
     # ranked within each group (A, B; teams without a group last)
     table = [row for g in sorted({c["group"] or "~" for c in cards})
              for row in standings([c for c in cards if (c["group"] or "~") == g], games)]
-    return {"role_leaders": leaders, "standings": table, "matches": out_matches}
+    return {"role_leaders": leaders, "players": players, "min_maps": min_maps(stats), "standings": table, "matches": out_matches}

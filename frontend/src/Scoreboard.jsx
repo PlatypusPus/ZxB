@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from './api.js'
-import { Footer, Nav, QUALIFY, qualify } from './Layout.jsx'
+import { Footer, Nav, qualify } from './Layout.jsx'
 
 // ⓘ button next to a section title. <details> needs no JS and works with keyboard and screen readers.
 export function Info({ label, children }) {
@@ -53,6 +53,42 @@ export function MatchSummary({ m }) {
   )
 }
 
+const STATS = [['acs', 'ACS', 'Average combat score per round'], ['kd', 'K/D', 'Kills per death'], ['adr', 'ADR', 'Average damage per round'],
+  ['kills', 'K', 'Kills'], ['deaths', 'D', 'Deaths'], ['assists', 'A', 'Assists'], ['hs', 'HS%', 'Headshot percentage'], ['first_kills', 'FK', 'First kills']]
+const ROLES = ['All', 'Duelist', 'Initiator', 'Controller', 'Sentinel', 'Flex']
+
+function Leaderboard({ players }) {
+  const [role, setRole] = useState('All')
+  const [sort, setSort] = useState('acs')
+  const dir = sort === 'deaths' ? 1 : -1      // fewest deaths first
+  const rows = players.filter(p => role === 'All' || p.role === role)
+    .sort((x, y) => (y.ranked - x.ranked) || dir * (x[sort] - y[sort]) || y.acs - x.acs)
+  return (
+    <>
+      <div className="sb-filter" role="group" aria-label="Filter by role">
+        {ROLES.map(r => <button key={r} type="button" className={'btn ghost' + (role === r ? ' on' : '')} aria-pressed={role === r} onClick={() => setRole(r)}>{r}</button>)}
+      </div>
+      <div className="table-wrap">
+        <table className="sb-table sb-players">
+          <thead><tr>
+            <th scope="col">#</th><th scope="col">Player</th><th scope="col" title="Maps played">Maps</th>
+            {STATS.map(([k, c, t]) => <th key={k} scope="col" title={t} aria-sort={sort === k ? (k === 'deaths' ? 'ascending' : 'descending') : undefined}>
+              <button type="button" className={sort === k ? 'on' : ''} onClick={() => setSort(k)}>{c}</button></th>)}
+          </tr></thead>
+          <tbody>{rows.map((p, i) => (
+            <tr key={p.id} className={p.ranked ? '' : 'sb-unranked'}>
+              <td className="digits">{p.ranked ? i + 1 : '–'}</td>
+              <td><span className="sb-side"><Logo team={p.team} /><span><strong>{p.display_name}</strong><br /><span className="muted small">{p.team?.tag ? `${p.team.tag} · ` : ''}{p.role}</span></span></span></td>
+              <td>{p.games}</td><td><strong className={sort === 'acs' ? 'amber' : ''}>{p.acs}</strong></td><td>{p.kd.toFixed(2)}</td><td>{p.adr}</td>
+              <td>{p.kills}</td><td>{p.deaths}</td><td>{p.assists}</td><td>{p.hs}%</td><td>{p.first_kills}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+    </>
+  )
+}
+
 export default function Scoreboard() {
   const [info, setInfo] = useState(null)
   const [data, setData] = useState(null)
@@ -71,69 +107,78 @@ export default function Scoreboard() {
         {err && <p className="err" role="alert">{err}</p>}
         {!data && !err && <p className="muted">Loading…</p>}
         {data && <>
-          <section aria-labelledby="leaders">
-            <Head title={<span id="leaders">Role leaders</span>} label="role leaders">
-              <p>The best player in each role, using the role they signed up with.</p>
-              <ul>
-                <li>Players are compared only with others in the same role, on stats that matter for it (for example, first kills for Duelists, assists for Initiators).</li>
-                <li>Small samples are evened out, so one huge map can't win it alone.</li>
-                <li><b>First kills</b>: rounds where they got the first kill.</li>
-                <li><b>Assists</b>: total assists.</li>
-                <li><b>KAST</b>: share of rounds with a kill, assist or survival (estimated from totals).</li>
-                <li><b>ACS</b>: average combat score per round.</li>
-              </ul>
-            </Head>
-            {data.role_leaders.length ? <div className="sb-leaders">{data.role_leaders.map(l => (
-              <article className="sb-leader" key={l.role}>
-                {l.card_url ? <img className="sb-card" src={l.card_url} alt="" loading="lazy" /> : <div className="sb-card sb-card-ph" aria-hidden="true" />}
-                <div className="sb-leader-body">
-                  <p className="tag">Best {l.role}</p>
-                  <h3 className="display">{l.display_name}</h3>
-                  <p className="muted small">{l.riot_id}</p>
-                  {l.team && <p className="sb-team"><Logo team={l.team} />{l.team.name}</p>}
-                  <p className="sb-stat"><span className="mono muted">{l.stat_label}</span><span className="digits amber">{l.stat_value}</span></p>
-                  <p className="mono muted">{l.games} {l.games === 1 ? 'MAP' : 'MAPS'}</p>
-                </div>
-              </article>
-            ))}</div> : <p className="muted">Awards appear once matches are published.</p>}
-          </section>
-
           <section aria-labelledby="standings">
             <Head title={<span id="standings">Team standings</span>} label="standings">
               <ul>
                 <li><b>P</b>: maps played</li>
                 <li><b>W</b>: wins</li>
                 <li><b>L</b>: losses</li>
-                <li><b>RW</b>: rounds won</li>
-                <li><b>RL</b>: rounds lost</li>
-                <li><b>RD</b>: round difference (RW − RL)</li>
+                <li><b>RD</b>: round difference (rounds won minus rounds lost)</li>
                 <li><b>Pts</b>: points. A win is 3, a loss by 3 rounds or fewer (including overtime) is 1, a bigger loss is 0.</li>
               </ul>
-              <p>Ties are split by RD, then rounds won, then the result between the two teams.</p>
-              <p>Teams are ranked within their group: {QUALIFY.map(([p, w]) => `${p} → ${w.toLowerCase()}`).join(', ')}.</p>
+              <p>Ties are split by RD, then rounds won, then the result between the two teams. Teams yet to play are listed last.</p>
+              <p>When a group finishes, 1st and 2nd go to the upper bracket, 3rd and 4th to the play-in, and 5th and 6th are out.</p>
             </Head>
             {[...new Set(data.standings.map(t => t.group || ''))].map(g => {
               const rows = data.standings.filter(t => (t.group || '') === g)
+              const final = g && rows.every(t => t.p >= rows.length - 1)   // no "eliminated" until the group is over
               return <div className="table-wrap" key={g}>
               <table className="sb-table sb-standings">
                 {g && <caption>Group {g}</caption>}
                 <thead><tr>
                   <th scope="col">#</th><th scope="col">Team</th>
-                  {[['P', 'Played'], ['W', 'Wins'], ['L', 'Losses'], ['RW', 'Rounds won'], ['RL', 'Rounds lost'], ['RD', 'Round difference'], ['Pts', 'Points']]
+                  {[['P', 'Played'], ['W', 'Wins'], ['L', 'Losses'], ['RD', 'Round difference'], ['Pts', 'Points']]
                     .map(([c, t]) => <th key={c} title={t} scope="col">{c}</th>)}
                 </tr></thead>
                 <tbody>{rows.map((t, i) => (
-                  <tr key={t.id} className={g ? 'q-' + qualify(i)[2] : ''} title={g ? qualify(i)[1] : undefined}>
-                    <td className="digits">{i + 1}</td>
+                  <tr key={t.id} className={(final ? 'q-' + qualify(i)[2] : '') + (t.p ? '' : ' sb-unranked')} title={final ? qualify(i)[1] : undefined}>
+                    <td className="digits">{t.p ? i + 1 : '–'}</td>
                     <td><span className="sb-side"><Logo team={t} />{t.name} <span className="muted">[{t.tag}]</span></span></td>
-                    <td>{t.p}</td><td>{t.w}</td><td>{t.l}</td><td>{t.rw}</td><td>{t.rl}</td>
+                    <td>{t.p}</td><td>{t.w}</td><td>{t.l}</td>
                     <td>{t.rd > 0 ? `+${t.rd}` : t.rd}</td><td><strong className="amber">{t.pts}</strong></td>
                   </tr>
                 ))}</tbody>
               </table>
-              {g && <p className="sb-key mono muted">{QUALIFY.map(([p, w, k]) => <span key={k} className={'q-' + k}>{p} · {w}</span>)}</p>}
+              {g && !final && <p className="sb-key mono muted">{rows.reduce((n, t) => n + t.p, 0) / 2} of {rows.length * (rows.length - 1) / 2} matches played. Qualification is set when the group ends.</p>}
+              {final && <p className="sb-key mono muted">{[['ub', '1st & 2nd · Upper bracket'], ['pi', '3rd & 4th · Play-in'], ['out', '5th & 6th · Out']].map(([k, w]) => <span key={k} className={'q-' + k}>{w}</span>)}</p>}
             </div>
             })}
+          </section>
+
+          <section aria-labelledby="leaders">
+            <Head title={<span id="leaders">Player leaderboard</span>} label="leaderboard">
+              <p>Players are ranked by <b>ACS</b>, with K/D breaking ties. Pick a role to compare like with like, or tap a column to sort by it.</p>
+              <ul>
+                <li><b>ACS</b>: average combat score per round</li>
+                <li><b>K/D</b>: kills per death</li>
+                <li><b>ADR</b>: average damage per round</li>
+                <li><b>K / D / A</b>: total kills, deaths, assists</li>
+                <li><b>HS%</b>: share of hits that were headshots</li>
+                <li><b>FK</b>: rounds where they got the first kill</li>
+              </ul>
+              <p>To be ranked, a player needs at least half as many maps as the busiest player. Roles are the ones players signed up with.</p>
+            </Head>
+            {data.players.length ? <>
+              <div className="sb-leaders" tabIndex="0" role="region" aria-label="Top player in each role">{data.role_leaders.map(l => (
+                <article className="sb-leader" key={l.role}>
+                  {l.card_url
+                    ? <img className="sb-card" src={l.card_url} alt="" loading="lazy" width="268" height="640" />
+                    : <div className="sb-card sb-card-ph" aria-hidden="true">{l.team?.logo_url && <img src={l.team.logo_url} alt="" />}</div>}
+                  <p className="sb-role">Top {l.role}</p>
+                  <div className="sb-leader-name">
+                    <h3 className="display">{l.display_name}</h3>
+                    {l.team && <p className="sb-team"><Logo team={l.team} />{l.team.name}</p>}
+                  </div>
+                  <dl className="sb-leader-stats">
+                    <div className="main"><dt>ACS</dt><dd>{l.acs}</dd></div>
+                    <div><dt>K/D</dt><dd>{l.kd.toFixed(2)}</dd></div>
+                    <div><dt>{l.games === 1 ? 'Map' : 'Maps'}</dt><dd>{l.games}</dd></div>
+                  </dl>
+                </article>
+              ))}</div>
+              <Leaderboard players={data.players} />
+              {data.min_maps > 1 && <p className="sb-key mono muted">Players with fewer than {data.min_maps} maps are listed last, unranked.</p>}
+            </> : <p className="muted">The leaderboard fills in once matches are published.</p>}
           </section>
 
           <section aria-labelledby="matches">

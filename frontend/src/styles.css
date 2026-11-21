@@ -657,14 +657,33 @@ textarea:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
 .sb-standings .digits { font-size: 20px; }
 .sb-standings td { vertical-align: middle; }
 .sb-standings td:nth-child(n+3), .sb-standings th:nth-child(n+3) { text-align: right; }
-.sb-leaders { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 16px; }
-.sb-leader { background: var(--card); border: 1px solid var(--line); display: grid; grid-template-rows: auto 1fr; }
-.sb-card { width: 100%; height: 15rem; object-fit: cover; object-position: top; display: block; background: var(--tile); }
-.sb-leader-body { padding: 14px 16px; }
-.sb-leader h3 { font-size: 24px; margin: 4px 0 2px; overflow-wrap: anywhere; }
-.sb-team { display: flex; align-items: center; margin: 10px 0; font-weight: 600; }
-.sb-stat { display: flex; justify-content: space-between; align-items: baseline; margin: 8px 0 4px; }
-.sb-stat .digits { font-size: 30px; }
+.sb-leaders { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.sb-leaders:focus-visible { outline: 2px solid var(--amber); outline-offset: 4px; }
+/* The Valorant card art is the card: full bleed, name on a scrim, stats on a solid plate so they always read. */
+.sb-leader { position: relative; isolation: isolate; display: flex; flex-direction: column; justify-content: flex-end; min-height: 27rem; overflow: hidden;
+  background: var(--tile); border: 1px solid var(--line); transition: border-color .25s ease, transform .35s cubic-bezier(.16, 1, .3, 1), box-shadow .35s ease; }
+.sb-leader::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(to top, var(--base) 22%, rgb(11 11 13 / .82) 40%, rgb(11 11 13 / 0) 66%); }
+.sb-leader:hover { border-color: var(--amber); transform: translateY(-4px); box-shadow: 0 16px 32px -14px rgb(0 0 0 / .8); }
+.sb-card { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover; object-position: top; transition: transform .6s cubic-bezier(.16, 1, .3, 1); }
+.sb-leader:hover .sb-card { transform: scale(1.04); }
+.sb-card-ph { display: grid; place-items: start center; padding-top: 3.5rem; background: var(--tile); }
+.sb-card-ph img { width: 55%; aspect-ratio: 1; object-fit: cover; opacity: .75; }
+.sb-role { position: absolute; top: 0; left: 0; margin: 0; padding: 5px 10px; background: var(--pink); color: var(--base);
+  font: 650 11px/1.5 var(--body); font-variation-settings: 'wdth' 82; letter-spacing: .12em; text-transform: uppercase; }
+.sb-leader-name { padding: 0 14px 12px; }
+.sb-leader h3 { font-size: clamp(26px, 2.5vw, 34px); line-height: 1; margin: 0; overflow-wrap: anywhere; text-wrap: balance; text-shadow: 0 2px 10px rgb(0 0 0 / .55); }
+.sb-team { display: flex; align-items: center; margin: 7px 0 0; font-size: 13px; font-weight: 600; line-height: 1.25; }
+.sb-team .sb-logo { width: 20px; height: 20px; flex: none; }
+.sb-leader-stats { display: grid; grid-template-columns: 1.25fr 1fr auto; gap: 8px; margin: 0; padding: 10px 14px 12px; background: var(--base); border-top: 1px solid var(--line); }
+.sb-leader-stats dt { font: 650 10px/1.4 var(--body); font-variation-settings: 'wdth' 82; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.sb-leader-stats dd { margin: 2px 0 0; font: 400 15px/1.2 var(--mono); font-variant-numeric: tabular-nums; color: var(--ink); }
+.sb-leader-stats .main dd { font-size: 24px; line-height: 1; color: var(--amber); }
+.sb-leader-stats > div { display: flex; flex-direction: column; justify-content: space-between; }
+@media (max-width: 1000px) {
+  .sb-leaders { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 8px; }
+  .sb-leader { flex: 0 0 min(15rem, 68vw); scroll-snap-align: start; min-height: 25rem; }
+}
+@media (prefers-reduced-motion: reduce) { .sb-leader, .sb-card { transition: none; } .sb-leader:hover { transform: none; } .sb-leader:hover .sb-card { transform: none; } }
 .sb-game { margin-bottom: 12px; padding: 0; }
 .sb-game summary { cursor: pointer; padding: 14px var(--t); list-style: none; }
 .sb-game summary::-webkit-details-marker { display: none; }
@@ -674,7 +693,7 @@ textarea:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
 .sb-match > .mono { grid-column: 1 / -1; }
 .sb-match > .sb-side:last-child { justify-self: end; }
 .sb-score { font-size: 22px; }
-@media (max-width: 700px) { .sb-card { height: 12rem; } .info-body { width: calc(100vw - 2 * var(--t)); } }
+@media (max-width: 700px) { .info-body { width: calc(100vw - 2 * var(--t)); } }
 .sb-picks { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: var(--t); margin-bottom: var(--t); }
 .sb-pick label { display: grid; gap: 6px; margin-bottom: 10px; }
 .sb-chips { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 6px; }
@@ -788,3 +807,14 @@ h1.display.vt-head { font-size: clamp(32px, 4.5vw, 56px); margin: 0 0 var(--t); 
 .sched-lede { margin: -8px 0 var(--t); }
 fieldset.field { border: 0; padding: 0; margin: 0 0 calc(var(--t) * .75); min-width: 0; }
 .settings :is(input, select):disabled { opacity: .45; cursor: not-allowed; }
+.sb-filter { display: flex; flex-wrap: wrap; gap: 8px; margin: var(--t) 0 12px; }
+.sb-filter .btn { min-height: 38px; padding: 4px 14px; }
+.sb-filter .btn.on { background: var(--amber); border-color: var(--amber); color: var(--base); }
+.sb-players td, .sb-players th { vertical-align: middle; white-space: nowrap; }
+.sb-players td:nth-child(n+3), .sb-players th:nth-child(n+3) { text-align: right; }
+.sb-players th button { all: unset; cursor: pointer; padding: 4px 2px; }
+.sb-players th button:focus-visible { outline: 2px solid var(--amber); }
+.sb-players th button.on { color: var(--amber); }
+.sb-unranked { opacity: .55; }
+.sb-players .digits { font-size: 20px; }
+.sb-standings + .sb-key { padding-bottom: 10px; }

@@ -48,23 +48,23 @@ def test_points_and_tiebreaks():
     assert [r["name"] for r in h2h] == ["Bravo", "Alpha"]
 
 
-def test_role_leaders_compare_within_the_signed_up_role():
-    def p(key, role, **kw):
-        base = {"key": key, "role": role, "games": 1, "rounds": 24, "kills": 15, "deaths": 15, "assists": 5,
-                "score": 4800, "damage": 3000, "headshots": 10, "bodyshots": 30, "legshots": 2,
-                "first_kills": 2, "first_deaths": 2, "agent": "Jett"}
-        return {**base, **kw}
-    stats = list(service.aggregate([
-        p(1, "Duelist", score=7200, first_kills=6), p(2, "Duelist", score=5000),
-        p(3, "Controller", assists=12), p(4, "Initiator", assists=14), p(5, "Sentinel"), p(6, "Flex"),
-    ]).values())
-    for s in stats:
-        s["role"] = {1: "Duelist", 2: "Duelist", 3: "Controller", 4: "Initiator", 5: "Sentinel", 6: "Flex"}[s["key"]]
-    leaders = {l["role"]: l for l in service.role_leaders(stats)}
-    assert set(leaders) == set(service.ROLES)
-    assert leaders["Duelist"]["key"] == 1 and leaders["Duelist"]["stat_value"] == 6
-    assert leaders["Controller"]["stat_label"] == "KAST" and str(leaders["Controller"]["stat_value"]).endswith("%")
-    assert service.aggregate([p(9, "Flex")])[9]["acs"] == 200 and service.aggregate([p(9, "Flex")])[9]["hs"] == 23.8
+def test_players_rank_by_acs_and_one_map_cannot_top_the_board():
+    def p(key, games=1, score=4800):
+        return [{"key": key, "rounds": 24, "kills": 15, "deaths": 15, "assists": 5, "score": score, "damage": 3000,
+                 "headshots": 10, "bodyshots": 30, "legshots": 2, "first_kills": 2, "first_deaths": 2, "agent": "Jett"}] * games
+    stats = list(service.aggregate(p(1, 3, 4800) + p(2, 4, 5200) + p(3, 1, 9000) + p(4, 2, 2400)).values())
+    for s, role in zip(stats, ("Duelist", "Duelist", "Duelist", "Sentinel")):
+        s["role"] = role
+    assert service.min_maps(stats) == 2 and service.aggregate(p(9))[9]["acs"] == 200
+    ranked = service.rank_players(stats)
+    assert [(s["key"], s["ranked"]) for s in ranked] == [(2, True), (1, True), (4, True), (3, False)]   # 1 map: listed last
+    assert {l["role"]: l["key"] for l in service.role_leaders(stats)} == {"Duelist": 2, "Sentinel": 4}
+
+
+def test_teams_yet_to_play_sit_below_teams_that_have():
+    teams = [{"id": 1, "name": "Alpha"}, {"id": 2, "name": "Bravo"}, {"id": 3, "name": "Charlie"}, {"id": 4, "name": "Delta"}]
+    table = service.standings(teams, [{"team_a_id": 3, "team_b_id": 4, "rounds_a": 13, "rounds_b": 2}])
+    assert [r["name"] for r in table] == ["Charlie", "Delta", "Alpha", "Bravo"]
 
 
 # ---------- the admin flow, with Henrik faked
@@ -135,6 +135,7 @@ async def test_admin_finds_imports_and_publishes_a_match(c, monkeypatch):
     assert pub["standings"][1]["pts"] == 1   # 11-13 is a close loss
     leaders = {l["role"]: l for l in pub["role_leaders"]}
     assert leaders["Duelist"]["display_name"] == "P0" and leaders["Duelist"]["card_url"].endswith("large.png")
+    assert pub["players"][0]["display_name"] == "P0" and pub["players"][0]["ranked"] is True
     assert "phone" not in str(pub) and "9000000000" not in str(pub)
 
     # a published match can't be overwritten by a re-import

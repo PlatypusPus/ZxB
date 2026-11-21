@@ -73,6 +73,24 @@ async def test_veto_from_coin_toss_to_side(c):
     assert (await c.get("/api/v1/admin/vetoes")).status_code == 401
 
 
+async def test_each_captain_plays_from_their_own_link(c):
+    await seed(n_teams=2, n_players=0)                     # nobody has an account
+    r = (await c.post("/api/v1/admin/vetoes", headers=c.admin, json={"team_a": 1, "team_b": 2, "pool": POOL[:2]})).json()
+    vid, url = r["id"], f"/api/v1/vetoes/{r['id']}"
+    k = {t: u.split("?k=")[1] for t, u in ((int(t), u) for t, u in r["links"].items())}
+    assert k[1] != k[2]
+    assert "links" not in (await c.get(url)).json()        # the public page never shows the keys
+    assert (await c.get(f"{url}?k={k[1]}")).json()["you"] == 1 and (await c.get(f"{url}?k={k[2]}")).json()["you"] == 2
+    assert (await c.get(f"{url}?k={k[1][:-1]}x")).json()["you"] is None
+    assert (await c.post(f"{url}/call", json={"value": "heads"})).status_code == 403
+    assert (await c.post(f"{url}/call?k={k[2]}", json={"value": "heads"})).status_code == 409
+    first = (await c.post(f"{url}/call?k={k[1]}", json={"value": "heads"})).json()["first_team_id"]
+    assert (await c.post(f"{url}/ban?k={k[first]}", json={"value": "Ascent"})).json()["status"] == "side"
+    assert (await c.post(f"{url}/side?k={k[3 - first]}", json={"value": "attack"})).json()["status"] == "done"
+    listed = (await c.get("/api/v1/admin/vetoes", headers=c.admin)).json()["vetoes"][0]
+    assert listed["id"] == vid and listed["links"] == r["links"]
+
+
 async def test_veto_link_for_a_stand_in(c):
     await seed(n_teams=2, n_players=0)
     a = await sign_in(c, 1)

@@ -135,7 +135,7 @@ export default function Veto({ id }) {
           </section>
         )}
 
-        {!v.you && !key && v.status !== 'done' && <p className="muted small vt-note">Captains: <a href="/profile">sign in</a> with the account you signed up with to make your moves. Everyone else can watch here.</p>}
+        {!v.you && !key && v.status !== 'done' && <p className="muted small vt-note">You're watching. Captains: open the link the organiser sent you to make your moves.</p>}
       </main>
       <Footer />
     </>

@@ -1,13 +1,14 @@
-"""Map veto (BO1, Challonge style). The organiser pairs two teams; their captains, signed in with their own accounts,
-call a coin toss, ban maps in turn until one is left, and the team that didn't make the last ban picks a side.
+"""Map veto (BO1, Challonge style). The organiser pairs two teams and sends each captain their team's link (or they sign in);
+they call a coin toss, ban maps in turn until one is left, and the team that didn't make the last ban picks a side.
 Anyone with the link can watch."""
+import hmac
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...core import SITE, audit, get_db, new_token, require_admin, sha256
+from ...core import SECRET_KEY, SITE, audit, get_db, new_token, require_admin, sha256
 from ...models import Player, Team, Veto
 from ..auction.service import active_sales, auction_teams
 from ..auth import identity, is_verified
@@ -84,9 +85,23 @@ def view(v: Veto, teams: dict, you: int | None = None) -> dict:
             "created_at": v.created_at}
 
 
+def team_key(v: Veto, team_id: int) -> str:
+    """The key in a team's veto link. Signed, so the organiser can copy it again any time.
+    ponytail: can't be revoked on its own; if one leaks, delete the veto and start a new one (new id, new links)."""
+    return hmac.new(SECRET_KEY.encode(), f"veto.{v.id}.{team_id}".encode(), "sha256").hexdigest()[:32]
+
+
+def admin_view(v: Veto, teams: dict) -> dict:
+    """The view plus each team's private link. Never send this from a public route."""
+    return {**view(v, teams), "links": {t: f"/veto/{v.id}?k={team_key(v, t)}" for t in (v.team_a_id, v.team_b_id)}}
+
+
 def key_team(v: Veto, key: str) -> int | None:
     """The team a veto link belongs to."""
     if key:
+        for t in (v.team_a_id, v.team_b_id):
+            if secrets.compare_digest(key.encode(), team_key(v, t).encode()):
+                return t
         h = sha256(key)
         if v.a_key_hash and secrets.compare_digest(h, v.a_key_hash):
             return v.team_a_id
@@ -159,7 +174,7 @@ async def admin_vetoes(db: AsyncSession = Depends(get_db), admin: str = Depends(
     return {"maps": MAPS, "last_pool": vetoes[0].pool if vetoes else [],
             "teams": [{**team_card(t), "captain": p.display_name, "has_account": bool(p.auth_sub), "players": roster(t, p)}
                       for t, p in teams.values()],
-            "vetoes": [view(v, teams) for v in vetoes]}
+            "vetoes": [admin_view(v, teams) for v in vetoes]}
 
 
 @router.post("/admin/vetoes")
@@ -183,7 +198,7 @@ async def create_veto(body: dict, db: AsyncSession = Depends(get_db), admin: str
     await db.flush()
     audit(db, admin, "veto.created", veto_id=v.id, team_a=a, team_b=b, pool=pool)
     await db.commit()
-    return view(v, teams)
+    return admin_view(v, teams)
 
 
 @router.post("/admin/vetoes/{veto_id}/link")

@@ -637,8 +637,10 @@ function VetoAdmin({ call }) {
 
   const pool = form.pool ?? data.last_pool
   const team = id => data.teams.find(t => t.id === +id)
-  const noAccount = [form.a, form.b].map(team).filter(t => t && !t.has_account)
-  const link = id => `${location.origin}/veto/${id}`
+  const url = path => location.origin + path
+  const copy = (text, done) => navigator.clipboard?.writeText(text).then(() => setFlash(done), () => setFlash(text))
+  // Ready to paste into WhatsApp or Discord: each captain finds their own team's link.
+  const both = v => `Map veto: ${v.team_a?.name} vs ${v.team_b?.name}\n\n${v.team_a?.name} captain:\n${url(v.links[v.team_a?.id])}\n\n${v.team_b?.name} captain:\n${url(v.links[v.team_b?.id])}\n\nOpen only your team's link. No sign-in needed.`
   const post = async (path, body, ok) => {
     setFlash('')
     try { const r = await call(path, { method: 'POST', body }); setFlash(ok(r)); setSure(null); load() } catch (e) { setFlash(e.message) }
@@ -647,7 +649,8 @@ function VetoAdmin({ call }) {
     e.preventDefault()
     post('/admin/vetoes', { team_a: +form.a, team_b: +form.b, pool }, r => {
       setForm({ a: '', b: '', pool })
-      return `Veto ready. The captains get a Map veto button in the top bar once signed in, or share ${link(r.id)}`
+      copy(both(r), 'Veto ready. Both captain links are copied, paste them to the captains.')
+      return 'Veto ready. Use Copy both links below to send it to the captains.'
     })
   }
 
@@ -655,7 +658,7 @@ function VetoAdmin({ call }) {
     <section>
       <form className="card" onSubmit={create}>
         <h3>New map veto</h3>
-        <p className="muted">Team A's captain calls the coin toss. The winner bans first, then the captains take turns banning until one map is left. The team that didn't make the last ban picks its starting side.</p>
+        <p className="muted">Team A's captain calls the coin toss. The winner bans first, then the captains take turns banning until one map is left. The team that didn't make the last ban picks its starting side. You get one link per captain to send them, no sign-in needed.</p>
         <div className="sb-picks">
           {[['a', 'Team A (calls the toss)'], ['b', 'Team B']].map(([k, label]) => (
             <label key={k} className="sb-pick">{label}<select value={form[k]} required onChange={e => setForm({ ...form, [k]: e.target.value })}>
@@ -670,7 +673,6 @@ function VetoAdmin({ call }) {
           return <li key={m}><MapCard map={m} i={i} state={on ? 'in' : 'off'} tag={on ? 'IN POOL' : ''} pressed={on}
             onClick={() => setForm(f => { const cur = f.pool ?? data.last_pool; return { ...f, pool: cur.includes(m) ? cur.filter(x => x !== m) : data.maps.filter(x => x === m || cur.includes(x)) } })} /></li>
         })}</ul>
-        {noAccount.map(t => <p key={t.id} className="err">{t.captain} ({t.name}) hasn't signed in with an account yet, so they can't veto until they do.</p>)}
         <div className="actions"><button className="btn" disabled={!form.a || !form.b || pool.length < 2}>Start veto</button></div>
       </form>
       {flash && <p className="flash" role="status">{flash}</p>}
@@ -682,8 +684,11 @@ function VetoAdmin({ call }) {
           <span><strong>{v.team_a?.name} vs {v.team_b?.name}</strong><br />
             <span className="muted small">{VETO_STATUS[v.status]}{v.map ? ` · ${v.map}` : ''}{v.side ? ` · ${data.teams.find(t => t.id === v.side_team_id)?.tag} on ${v.side}` : ''}{[v.team_a, v.team_b].filter(t => t?.delegate).map(t => ` · ${t.delegate} vetoes for ${t.tag}`).join('')}</span></span>
           <span className="tp-acts">
-            <a className="btn ghost" href={`/veto/${v.id}`} target="_blank" rel="noreferrer">Open</a>
-            <button className="btn ghost" onClick={() => navigator.clipboard?.writeText(link(v.id)).then(() => setFlash(`Copied ${link(v.id)}`))}>Copy link</button>
+            <a className="btn ghost" href={`/veto/${v.id}`} target="_blank" rel="noreferrer">Watch</a>
+            {v.status !== 'done' && <>
+              <button className="btn" onClick={() => copy(both(v), 'Both captain links copied. Paste them to the captains.')}>Copy both links</button>
+              {[v.team_a, v.team_b].map(t => t && <button key={t.id} className="btn ghost" onClick={() => copy(url(v.links[t.id]), `${t.name} captain's link copied.`)}>{t.tag} link</button>)}
+            </>}
             {v.status !== 'coin' && <button className="btn ghost" onClick={() => post(`/admin/vetoes/${v.id}/reset`, {}, () => 'Veto restarted from the coin toss.')}>Restart</button>}
             {v.status !== 'done' && <select aria-label="Give the veto link to someone else on the team" value={stand[v.id] || ''}
               onChange={e => setStand({ ...stand, [v.id]: e.target.value })}>

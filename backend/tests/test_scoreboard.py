@@ -151,6 +151,7 @@ async def test_admin_finds_imports_and_publishes_a_match(c, monkeypatch):
     leaders = {l["role"]: l for l in pub["role_leaders"]}
     assert leaders["Duelist"]["display_name"] == "P0" and leaders["Duelist"]["card_url"].endswith("large.png")
     assert pub["players"][0]["display_name"] == "P0" and pub["players"][0]["rating"] > 0
+    assert pub["rating"]["rounds"] == service.BASELINE_ROUNDS and pub["rating"]["baseline"] > 0
     assert "phone" not in str(pub) and "9000000000" not in str(pub)
     # only rostered players on maps for their own team: P2/P3 weren't bought, so they don't appear
     assert {p["display_name"]: p["games"] for p in pub["players"]} == {"P0": 1, "P1": 1}

@@ -57,6 +57,22 @@ const STATS = [['rating', 'Rating', 'ACS adjusted for maps played: fewer maps pu
   ['kills', 'K', 'Kills'], ['deaths', 'D', 'Deaths'], ['assists', 'A', 'Assists'], ['hs', 'HS%', 'Headshot percentage'], ['first_kills', 'FK', 'First kills']]
 const ROLES = ['All', 'Duelist', 'Initiator', 'Controller', 'Sentinel', 'Flex']
 
+// Rating = (combat score + K × B) ÷ (rounds + K): K rounds of below-average play (B) added to every record.
+function RatingMaths({ r }) {
+  const K = r.rounds, B = r.baseline
+  const rate = (acs, maps) => Math.round((acs * maps * 24 + B * K) / (maps * 24 + K))   // 24 rounds ≈ one map
+  return <>
+    <h3 className="mono amber small">How Rating is worked out</h3>
+    <p className="mono">Rating = (total combat score + {K} × {B}) ÷ (rounds played + {K})</p>
+    <ul>
+      <li><b>{B}</b> is the baseline: {Math.round(r.share * 100)}% of the league's average ACS. It updates as matches are published.</li>
+      <li><b>{K} rounds</b> (about 3 maps) of baseline play are added to every player's record. ACS is combat score ÷ rounds; Rating is the same sum with those extra rounds mixed in.</li>
+      <li>With few rounds the baseline dominates; with many it fades, and Rating gets close to ACS.</li>
+    </ul>
+    <p>Example, with maps of 24 rounds: 1 map at 350 ACS rates <b>{rate(350, 1)}</b>. 5 maps at 260 ACS rate <b>{rate(260, 5)}</b>. 5 maps at 350 ACS rate <b>{rate(350, 5)}</b>.</p>
+  </>
+}
+
 function Leaderboard({ players }) {
   const [role, setRole] = useState('All')
   const [sort, setSort] = useState('rating')
@@ -158,6 +174,7 @@ export default function Scoreboard() {
                 <li><b>FK</b>: rounds where they got the first kill</li>
               </ul>
               <p>Everyone who has played a map is ranked. Roles are the ones players signed up with.</p>
+              {data.rating && <RatingMaths r={data.rating} />}
             </Head>
             {data.players.length ? <>
               <div className="sb-leaders" tabIndex="0" role="region" aria-label="Top player in each role">{data.role_leaders.map(l => (

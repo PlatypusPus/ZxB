@@ -163,11 +163,16 @@ BASELINE_ROUNDS = 72   # about 3 maps of below-average play added to everyone's 
 BASELINE_SHARE = 0.75  # ...at 75% of the league's ACS
 
 
+def baseline(stats: list[dict]) -> float:
+    """The below-average ACS every record is blended with: BASELINE_SHARE of the league's ACS."""
+    rounds = sum(s["rounds"] for s in stats)
+    return BASELINE_SHARE * sum(s["score"] for s in stats) / rounds if rounds else 0
+
+
 def rank_players(stats: list[dict]) -> list[dict]:
     """Everyone is ranked by rating: ACS blended with a below-average baseline, so few maps pull a player down
     and the pull fades as they play more. K/D breaks ties."""
-    rounds = sum(s["rounds"] for s in stats)
-    base = BASELINE_SHARE * sum(s["score"] for s in stats) / rounds if rounds else 0
+    base = baseline(stats)
     rated = [{**s, "rating": round((s["score"] + base * BASELINE_ROUNDS) / (s["rounds"] + BASELINE_ROUNDS))} for s in stats]
     return sorted(rated, key=lambda s: (-s["rating"], -s["kd"]))
 
@@ -375,4 +380,5 @@ async def board(db: AsyncSession, published_only: bool = True) -> dict:
     # ranked within each group (A, B; teams without a group last)
     table = [row for g in sorted({c["group"] or "~" for c in cards})
              for row in standings([c for c in cards if (c["group"] or "~") == g], games)]
-    return {"role_leaders": leaders, "players": players, "standings": table, "matches": out_matches}
+    return {"role_leaders": leaders, "players": players,
+            "rating": {"baseline": round(baseline(stats)), "rounds": BASELINE_ROUNDS, "share": BASELINE_SHARE}, "standings": table, "matches": out_matches}

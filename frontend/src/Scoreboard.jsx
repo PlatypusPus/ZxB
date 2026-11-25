@@ -53,16 +53,16 @@ export function MatchSummary({ m }) {
   )
 }
 
-const STATS = [['acs', 'ACS', 'Average combat score per round'], ['kd', 'K/D', 'Kills per death'], ['adr', 'ADR', 'Average damage per round'],
+const STATS = [['rating', 'Rating', 'ACS adjusted for maps played: fewer maps pull it down'], ['acs', 'ACS', 'Average combat score per round'], ['kd', 'K/D', 'Kills per death'], ['adr', 'ADR', 'Average damage per round'],
   ['kills', 'K', 'Kills'], ['deaths', 'D', 'Deaths'], ['assists', 'A', 'Assists'], ['hs', 'HS%', 'Headshot percentage'], ['first_kills', 'FK', 'First kills']]
 const ROLES = ['All', 'Duelist', 'Initiator', 'Controller', 'Sentinel', 'Flex']
 
 function Leaderboard({ players }) {
   const [role, setRole] = useState('All')
-  const [sort, setSort] = useState('acs')
+  const [sort, setSort] = useState('rating')
   const dir = sort === 'deaths' ? 1 : -1      // fewest deaths first
   const rows = players.filter(p => role === 'All' || p.role === role)
-    .sort((x, y) => (y.ranked - x.ranked) || dir * (x[sort] - y[sort]) || y.acs - x.acs)
+    .sort((x, y) => dir * (x[sort] - y[sort]) || y.rating - x.rating)
   return (
     <>
       <div className="sb-filter" role="group" aria-label="Filter by role">
@@ -76,10 +76,10 @@ function Leaderboard({ players }) {
               <button type="button" className={sort === k ? 'on' : ''} onClick={() => setSort(k)}>{c}</button></th>)}
           </tr></thead>
           <tbody>{rows.map((p, i) => (
-            <tr key={p.id} className={p.ranked ? '' : 'sb-unranked'}>
-              <td className="digits">{p.ranked ? i + 1 : '–'}</td>
+            <tr key={p.id}>
+              <td className="digits">{i + 1}</td>
               <td><span className="sb-side"><Logo team={p.team} /><span><strong>{p.display_name}</strong><br /><span className="muted small">{p.team?.tag ? `${p.team.tag} · ` : ''}{p.role}</span></span></span></td>
-              <td>{p.games}</td><td><strong className={sort === 'acs' ? 'amber' : ''}>{p.acs}</strong></td><td>{p.kd.toFixed(2)}</td><td>{p.adr}</td>
+              <td>{p.games}</td><td><strong className={sort === 'rating' ? 'amber' : ''}>{p.rating}</strong></td><td>{p.acs}</td><td>{p.kd.toFixed(2)}</td><td>{p.adr}</td>
               <td>{p.kills}</td><td>{p.deaths}</td><td>{p.assists}</td><td>{p.hs}%</td><td>{p.first_kills}</td>
             </tr>
           ))}</tbody>
@@ -147,8 +147,9 @@ export default function Scoreboard() {
 
           <section aria-labelledby="leaders">
             <Head title={<span id="leaders">Player leaderboard</span>} label="leaderboard">
-              <p>Players are ranked by <b>ACS</b>, with K/D breaking ties. Pick a role to compare like with like, or tap a column to sort by it.</p>
+              <p>Players are ranked by <b>Rating</b>, with K/D breaking ties. Pick a role to compare like with like, or tap a column to sort by it.</p>
               <ul>
+                <li><b>Rating</b>: ACS with about three maps of below-average play mixed in, so one big game can't top the board. The fewer maps someone has played, the more it pulls them down</li>
                 <li><b>ACS</b>: average combat score per round</li>
                 <li><b>K/D</b>: kills per death</li>
                 <li><b>ADR</b>: average damage per round</li>
@@ -156,7 +157,7 @@ export default function Scoreboard() {
                 <li><b>HS%</b>: share of hits that were headshots</li>
                 <li><b>FK</b>: rounds where they got the first kill</li>
               </ul>
-              <p>To be ranked, a player needs at least half as many maps as the busiest player. Roles are the ones players signed up with.</p>
+              <p>Everyone who has played a map is ranked. Roles are the ones players signed up with.</p>
             </Head>
             {data.players.length ? <>
               <div className="sb-leaders" tabIndex="0" role="region" aria-label="Top player in each role">{data.role_leaders.map(l => (
@@ -170,14 +171,14 @@ export default function Scoreboard() {
                     {l.team && <p className="sb-team"><Logo team={l.team} />{l.team.name}</p>}
                   </div>
                   <dl className="sb-leader-stats">
-                    <div className="main"><dt>ACS</dt><dd>{l.acs}</dd></div>
-                    <div><dt>K/D</dt><dd>{l.kd.toFixed(2)}</dd></div>
+                    <div className="main"><dt>Rating</dt><dd>{l.rating}</dd></div>
+                    <div><dt>ACS</dt><dd>{l.acs}</dd></div>
                     <div><dt>{l.games === 1 ? 'Map' : 'Maps'}</dt><dd>{l.games}</dd></div>
                   </dl>
                 </article>
               ))}</div>
               <Leaderboard players={data.players} />
-              <p className="sb-key mono muted">Auction players only, on maps for their own team. Stand-in games don't count.{data.min_maps > 1 && ` Players with fewer than ${data.min_maps} maps are listed last, unranked.`}</p>
+              <p className="sb-key mono muted">Auction players only, on maps for their own team. Stand-in games don't count.</p>
             </> : <p className="muted">The leaderboard fills in once matches are published.</p>}
           </section>
 

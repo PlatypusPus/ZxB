@@ -159,20 +159,22 @@ def aggregate(rows: list[dict]) -> dict:
     return agg
 
 
-def min_maps(stats: list[dict]) -> int:
-    """Maps needed to be ranked: half of what the busiest player has played, so one hot map can't top the board."""
-    return (max((s["games"] for s in stats), default=0) + 1) // 2
+BASELINE_ROUNDS = 72   # about 3 maps of below-average play added to everyone's record
+BASELINE_SHARE = 0.75  # ...at 75% of the league's ACS
 
 
 def rank_players(stats: list[dict]) -> list[dict]:
-    """Ranked by ACS (K/D breaks ties). Players short of the minimum maps are listed after, unranked."""
-    need = min_maps(stats)
-    return sorted(({**s, "ranked": s["games"] >= need} for s in stats), key=lambda s: (not s["ranked"], -s["acs"], -s["kd"]))
+    """Everyone is ranked by rating: ACS blended with a below-average baseline, so few maps pull a player down
+    and the pull fades as they play more. K/D breaks ties."""
+    rounds = sum(s["rounds"] for s in stats)
+    base = BASELINE_SHARE * sum(s["score"] for s in stats) / rounds if rounds else 0
+    rated = [{**s, "rating": round((s["score"] + base * BASELINE_ROUNDS) / (s["rounds"] + BASELINE_ROUNDS))} for s in stats]
+    return sorted(rated, key=lambda s: (-s["rating"], -s["kd"]))
 
 
 def role_leaders(stats: list[dict]) -> list[dict]:
-    """stats rows carry 'role' (the role they signed up with). The top ranked player in each role."""
-    ranked = [s for s in rank_players(stats) if s["ranked"]]
+    """stats rows carry 'role' (the role they signed up with). The top rated player in each role."""
+    ranked = rank_players(stats)
     return [{"role": role, **best} for role in ROLES if (best := next((s for s in ranked if s.get("role") == role), None))]
 
 
@@ -362,15 +364,15 @@ async def board(db: AsyncSession, published_only: bool = True) -> dict:
         p = people[s["key"]]
         s.update(role=p.role, display_name=p.display_name, riot_id=p.riot_id, card_url=p.card_url,
                  card_wide_url=p.card_wide_url, agents=dict(s["agents"]), team=team_card(teams[home[s["key"]]]))
-    public = ("display_name", "riot_id", "role", "team", "games", "acs", "kd", "adr", "hs", "kills", "deaths", "assists",
+    public = ("display_name", "riot_id", "role", "team", "games", "rating", "acs", "kd", "adr", "hs", "kills", "deaths", "assists",
               "first_kills", "first_deaths")
-    leaders = [{k: l[k] for k in ("role", "display_name", "riot_id", "card_url", "team", "games", "acs", "kd")}
+    leaders = [{k: l[k] for k in ("role", "display_name", "riot_id", "card_url", "team", "games", "rating", "acs", "kd")}
                for l in role_leaders(stats)]
-    players = [{"id": p["key"], "ranked": p["ranked"], **{k: p[k] for k in public}} for p in rank_players(stats)]
+    players = [{"id": p["key"], **{k: p[k] for k in public}} for p in rank_players(stats)]
     cards = [team_card(t) for t in approved.values()]
     games = [{"team_a_id": m.team_a_id, "team_b_id": m.team_b_id, "rounds_a": m.rounds_a, "rounds_b": m.rounds_b}
              for m in published]
     # ranked within each group (A, B; teams without a group last)
     table = [row for g in sorted({c["group"] or "~" for c in cards})
              for row in standings([c for c in cards if (c["group"] or "~") == g], games)]
-    return {"role_leaders": leaders, "players": players, "min_maps": min_maps(stats), "standings": table, "matches": out_matches}
+    return {"role_leaders": leaders, "players": players, "standings": table, "matches": out_matches}

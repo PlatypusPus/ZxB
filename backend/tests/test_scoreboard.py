@@ -48,17 +48,20 @@ def test_points_and_tiebreaks():
     assert [r["name"] for r in h2h] == ["Bravo", "Alpha"]
 
 
-def test_players_rank_by_acs_and_one_map_cannot_top_the_board():
+def test_everyone_is_ranked_but_few_maps_pull_the_rating_down():
     def p(key, games=1, score=4800):
         return [{"key": key, "rounds": 24, "kills": 15, "deaths": 15, "assists": 5, "score": score, "damage": 3000,
                  "headshots": 10, "bodyshots": 30, "legshots": 2, "first_kills": 2, "first_deaths": 2, "agent": "Jett"}] * games
-    stats = list(service.aggregate(p(1, 3, 4800) + p(2, 4, 5200) + p(3, 1, 9000) + p(4, 2, 2400)).values())
-    for s, role in zip(stats, ("Duelist", "Duelist", "Duelist", "Sentinel")):
+    # 1 and 5 play equally well (200 ACS); 5 has 6 maps, 1 has 1. 3 had one huge map (375 ACS).
+    stats = list(service.aggregate(p(1, 1, 4800) + p(5, 6, 4800) + p(2, 4, 5200) + p(3, 1, 9000) + p(4, 2, 2400)).values())
+    for s, role in zip(stats, ("Duelist", "Initiator", "Duelist", "Duelist", "Sentinel")):
         s["role"] = role
-    assert service.min_maps(stats) == 2 and service.aggregate(p(9))[9]["acs"] == 200
-    ranked = service.rank_players(stats)
-    assert [(s["key"], s["ranked"]) for s in ranked] == [(2, True), (1, True), (4, True), (3, False)]   # 1 map: listed last
-    assert {l["role"]: l["key"] for l in service.role_leaders(stats)} == {"Duelist": 2, "Sentinel": 4}
+    ranked = {s["key"]: s for s in service.rank_players(stats)}
+    assert len(ranked) == 5                                   # one map is enough to appear
+    assert ranked[5]["rating"] > ranked[1]["rating"]          # same ACS, more maps ranks higher
+    assert ranked[3]["rating"] < ranked[3]["acs"] - 150       # one hot map is heavily discounted
+    assert [s["key"] for s in service.rank_players(stats)][-1] == 4
+    assert {l["role"]: l["key"] for l in service.role_leaders(stats)} == {"Duelist": 3, "Initiator": 5, "Sentinel": 4}
 
 
 def test_teams_yet_to_play_sit_below_teams_that_have():
@@ -147,7 +150,7 @@ async def test_admin_finds_imports_and_publishes_a_match(c, monkeypatch):
     assert pub["standings"][1]["pts"] == 1   # 11-13 is a close loss
     leaders = {l["role"]: l for l in pub["role_leaders"]}
     assert leaders["Duelist"]["display_name"] == "P0" and leaders["Duelist"]["card_url"].endswith("large.png")
-    assert pub["players"][0]["display_name"] == "P0" and pub["players"][0]["ranked"] is True
+    assert pub["players"][0]["display_name"] == "P0" and pub["players"][0]["rating"] > 0
     assert "phone" not in str(pub) and "9000000000" not in str(pub)
     # only rostered players on maps for their own team: P2/P3 weren't bought, so they don't appear
     assert {p["display_name"]: p["games"] for p in pub["players"]} == {"P0": 1, "P1": 1}

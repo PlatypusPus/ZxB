@@ -215,6 +215,13 @@ class GameMatchPlayer(Base):
     first_deaths: Mapped[int] = mapped_column(Integer, default=0)
 
 
+class PlayerAlias(Base):
+    """A Riot account someone played on that isn't the one they signed up with (alt, friend's account)."""
+    __tablename__ = "player_alias"
+    puuid: Mapped[str] = mapped_column(String(80), primary_key=True)
+    player_id: Mapped[int] = mapped_column(ForeignKey("player.id", ondelete="CASCADE"), index=True)
+
+
 class Veto(Base):
     """BO1 map veto between two captains: coin toss, alternating bans until one map is left, then a side pick."""
     __tablename__ = "veto"

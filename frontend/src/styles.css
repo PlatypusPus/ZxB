@@ -723,7 +723,7 @@ textarea:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
 .group-block + .group-block { margin-top: calc(var(--t) * 2); }
 .group-h { font-size: 32px; margin: 0 0 var(--t); color: var(--amber); }
 .q-ub { --q: var(--amber); } .q-pi { --q: var(--pink); } .q-out { --q: var(--line); }
-.sb-standings tr[class^="q-"] td:first-child { box-shadow: inset 4px 0 0 var(--q); }
+.sb-standings tr[class^="q-"] td:first-child::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; background: var(--q); vertical-align: middle; }
 .sb-standings caption { text-align: left; font: 400 28px var(--display); color: var(--amber); padding: 0 0 10px; }
 .table-wrap + .table-wrap { margin-top: calc(var(--t) * 1.5); }
 .sb-key { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 10px 0 0; font-size: 12px; }

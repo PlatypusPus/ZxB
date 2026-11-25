@@ -126,6 +126,18 @@ async def test_admin_finds_imports_and_publishes_a_match(c, monkeypatch):
     assert game["status"] == "candidate" and len(game["players"]) == 5
     standin = next(p for p in game["players"] if p["riot_id"] == "standin#T")
     assert standin["team_id"] == 1 and standin["player_id"] is None
+    assert [u["riot_id"] for u in admin["unlinked"]] == ["standin#T"] and admin["unlinked"][0]["teams"] == ["TAA"]
+
+    # the stand-in is player 5 on an alt: linking moves the row to them and survives a re-import; unlink reverts
+    assert (await c.post(S + "/link", json={"puuid": "pu-standin", "player_id": 5}, headers=c.admin)).json() == {"rows": 1}
+    await c.post(S + "/import", json={**lineup, "match_id": "M1"}, headers=c.admin)
+    admin = (await c.get(S, headers=c.admin)).json()
+    assert admin["unlinked"] == [] and admin["aliases"][0]["player_id"] == 5
+    assert next(p for p in admin["matches"][0]["players"] if p["riot_id"] == "standin#T")["player_id"] == 5
+    await c.post(S + "/link", json={"puuid": "pu-standin", "player_id": None}, headers=c.admin)
+    admin = (await c.get(S, headers=c.admin)).json()
+    assert admin["aliases"] == [] and len(admin["unlinked"]) == 1
+    game = admin["matches"][0]
 
     assert (await c.post(f"{S}/matches/{game['id']}/publish", headers=c.admin)).status_code == 200
     pub = (await c.get("/api/v1/scoreboard")).json()

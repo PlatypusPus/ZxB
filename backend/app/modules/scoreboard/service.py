@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...models import GameMatch, GameMatchPlayer, Player, Team
+from ...models import GameMatch, GameMatchPlayer, Player, PlayerAlias, Team
 from ..auction.service import active_sales, auction_teams
 from . import henrik
 
@@ -269,12 +269,45 @@ async def import_match(db: AsyncSession, match_id: str, team_a: Team, team_b: Te
     known = {p.puuid: p.id for p in await db.scalars(
         select(Player).where(Player.puuid.in_([r["puuid"] for r in parsed["players"]] or [""]),
                              Player.status.not_in(["rejected", "withdrawn"])))}
+    known.update({a.puuid: a.player_id for a in await db.scalars(
+        select(PlayerAlias).where(PlayerAlias.puuid.in_([r["puuid"] for r in parsed["players"]] or [""])))})
     for r in parsed["players"]:
         side = r.pop("side")
         db.add(GameMatchPlayer(match_id=m.id, team_id=team_a.id if side == "a" else team_b.id,
                                player_id=known.get(r["puuid"]), **r))
     await db.commit()
     return m
+
+
+async def accounts(db: AsyncSession) -> dict:
+    """Riot accounts in imported matches that count for nobody yet, and the ones already linked as alts."""
+    rows = list(await db.execute(select(GameMatchPlayer.puuid, GameMatchPlayer.riot_id, GameMatchPlayer.team_id)
+                                 .where(GameMatchPlayer.player_id.is_(None))))
+    tags = {t.id: t.tag for t in await db.scalars(select(Team))}
+    unlinked: dict[str, dict] = {}
+    for puuid, riot_id, team_id in rows:
+        u = unlinked.setdefault(puuid, {"puuid": puuid, "riot_id": riot_id, "games": 0, "teams": []})
+        u["games"] += 1
+        if tags.get(team_id) and tags[team_id] not in u["teams"]:
+            u["teams"].append(tags[team_id])
+    aliases = list(await db.execute(select(PlayerAlias, Player).join(Player, Player.id == PlayerAlias.player_id)))
+    seen = {pu: rid for pu, rid in await db.execute(select(GameMatchPlayer.puuid, GameMatchPlayer.riot_id)
+                                                    .where(GameMatchPlayer.puuid.in_([a.puuid for a, _ in aliases] or [""])))}
+    return {"unlinked": sorted(unlinked.values(), key=lambda u: -u["games"]),
+            "aliases": [{"puuid": a.puuid, "riot_id": seen.get(a.puuid, a.puuid[:8]), "player_id": p.id,
+                         "display_name": p.display_name} for a, p in aliases]}
+
+
+async def link(db: AsyncSession, puuid: str, player_id: int | None) -> int:
+    """Count this account's games for player_id (None unlinks). Returns match rows changed."""
+    await db.execute(delete(PlayerAlias).where(PlayerAlias.puuid == puuid))
+    if player_id:
+        db.add(PlayerAlias(puuid=puuid, player_id=player_id))
+    # an account that is someone's own signed-up puuid stays theirs
+    owner = await db.scalar(select(Player.id).where(Player.puuid == puuid, Player.status.not_in(["rejected", "withdrawn"])))
+    res = await db.execute(GameMatchPlayer.__table__.update().where(GameMatchPlayer.puuid == puuid)
+                           .values(player_id=player_id or owner))
+    return res.rowcount
 
 
 async def board(db: AsyncSession, published_only: bool = True) -> dict:

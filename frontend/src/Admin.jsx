@@ -753,6 +753,10 @@ function ScoreboardAdmin({ call }) {
     await call(`/admin/scoreboard/matches/${m.id}/${what}`, { method: 'POST', body: {} })
     setSure(null); load()
   })
+  const linkTo = (puuid, player_id) => run('link', async () => {
+    const r = await call('/admin/scoreboard/link', { method: 'POST', body: { puuid, player_id } })
+    setFlash(`${player_id ? 'Linked' : 'Unlinked'}: ${r.rows} match ${r.rows === 1 ? 'row' : 'rows'} updated.`); load()
+  })
 
   const side = s => (
     <div className="card sb-pick" key={s}>
@@ -811,6 +815,26 @@ function ScoreboardAdmin({ call }) {
           </li>
         ))}</ul>
       </div>}
+
+      <h3 className="display sb-admin-h">Accounts to link</h3>
+      <p>Riot accounts from imported matches that aren't anyone's signed-up account: a stand-in from another team, or a player on an alt. Link one to a player and its games count for them on the player leaderboard, now and in future imports.</p>
+      {data.unlinked.length === 0 && <p className="muted">Every account in the imported matches belongs to a player.</p>}
+      <ul className="sb-found">{data.unlinked.map(u => (
+        <li key={u.puuid}>
+          <span><strong>{u.riot_id}</strong><br /><span className="muted small">{u.games} {u.games === 1 ? 'map' : 'maps'} · played for {u.teams.join(', ') || '?'}</span></span>
+          <select aria-label={`Link ${u.riot_id} to a player`} value="" disabled={!!busy} onChange={e => e.target.value && linkTo(u.puuid, +e.target.value)}>
+            <option value="">Link to a player…</option>
+            {data.players.map(p => <option key={p.id} value={p.id}>{p.display_name} · {p.riot_id}</option>)}
+          </select>
+        </li>
+      ))}</ul>
+      {data.aliases.length > 0 && <details className="card">
+        <summary>{data.aliases.length} linked {data.aliases.length === 1 ? 'account' : 'accounts'}</summary>
+        <ul className="sb-found">{data.aliases.map(a => (
+          <li key={a.puuid}><span><strong>{a.riot_id}</strong> → {a.display_name}</span>
+            <button className="btn ghost" disabled={!!busy} onClick={() => linkTo(a.puuid, null)}>Unlink</button></li>
+        ))}</ul>
+      </details>}
 
       <h3 className="display sb-admin-h">Imported matches</h3>
       {data.matches.length === 0 && <p className="muted">Nothing imported yet.</p>}

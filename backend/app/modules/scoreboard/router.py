@@ -28,7 +28,26 @@ async def admin_scoreboard(db: AsyncSession = Depends(get_db), admin: str = Depe
     return {"configured": bool(henrik.KEY),
             "teams": [{**service.team_card(v["team"]), "players": [card(p) for p in v["players"]]} for v in lineups.values()],
             "players": [card(p) for p in pool],
+            **await service.accounts(db),
             **await service.board(db, published_only=False)}
+
+
+@router.post("/admin/scoreboard/link")
+async def link(body: dict, db: AsyncSession = Depends(get_db), admin: str = Depends(require_admin)):
+    """Map a Riot account from imported matches to a signed-up player (player_id null unlinks)."""
+    puuid = str(body.get("puuid") or "").strip()
+    try:
+        player_id = int(body["player_id"]) if body.get("player_id") else None
+    except (TypeError, ValueError):
+        raise HTTPException(422, "Pick a player")
+    if not puuid:
+        raise HTTPException(422, "Pick an account")
+    if player_id and not await db.get(Player, player_id):
+        raise HTTPException(404, "Player not found")
+    rows = await service.link(db, puuid, player_id)
+    audit(db, admin, "scoreboard.linked" if player_id else "scoreboard.unlinked", puuid=puuid, player_id=player_id, rows=rows)
+    await db.commit()
+    return {"rows": rows}
 
 
 async def _sides(db: AsyncSession, body: dict) -> tuple[Team, Team, list[Player], list[Player]]:

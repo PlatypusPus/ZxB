@@ -817,7 +817,7 @@ function ScoreboardAdmin({ call }) {
       </div>}
 
       <h3 className="display sb-admin-h">Accounts to link</h3>
-      <p>Riot accounts from imported matches that aren't anyone's signed-up account: a stand-in from another team, or a player on an alt. Link one to a player and its games count for them on the player leaderboard, now and in future imports.</p>
+      <p>Riot accounts from imported matches that aren't anyone's signed-up account: a stand-in from another team, or a player on an alt. Link one to a player and it's treated as theirs, now and in future imports. Only maps a captain or bought player plays for their own team count on the player leaderboard, so linking matters for alts, not stand-ins.</p>
       {data.unlinked.length === 0 && <p className="muted">Every account in the imported matches belongs to a player.</p>}
       <ul className="sb-found">{data.unlinked.map(u => (
         <li key={u.puuid}>

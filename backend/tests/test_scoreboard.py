@@ -149,6 +149,13 @@ async def test_admin_finds_imports_and_publishes_a_match(c, monkeypatch):
     assert leaders["Duelist"]["display_name"] == "P0" and leaders["Duelist"]["card_url"].endswith("large.png")
     assert pub["players"][0]["display_name"] == "P0" and pub["players"][0]["ranked"] is True
     assert "phone" not in str(pub) and "9000000000" not in str(pub)
+    # only rostered players on maps for their own team: P2/P3 weren't bought, so they don't appear
+    assert {p["display_name"]: p["games"] for p in pub["players"]} == {"P0": 1, "P1": 1}
+    # team 1's stand-in turns out to be P1 (team 2's captain) on an alt: that map doesn't count for P1
+    await c.post(S + "/link", json={"puuid": "pu-standin", "player_id": 2}, headers=c.admin)
+    pub = (await c.get("/api/v1/scoreboard")).json()
+    assert {p["display_name"]: p["games"] for p in pub["players"]} == {"P0": 1, "P1": 1}
+    assert pub["matches"][0]["players"] and len(pub["matches"][0]["players"]) == 5   # match table still shows everyone
 
     # a published match can't be overwritten by a re-import
     assert (await c.post(S + "/import", json={**lineup, "match_id": "M1"}, headers=c.admin)).status_code == 409

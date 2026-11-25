@@ -177,7 +177,7 @@ export default function Scoreboard() {
                 </article>
               ))}</div>
               <Leaderboard players={data.players} />
-              {data.min_maps > 1 && <p className="sb-key mono muted">Players with fewer than {data.min_maps} maps are listed last, unranked.</p>}
+              <p className="sb-key mono muted">Auction players only, on maps for their own team. Stand-in games don't count.{data.min_maps > 1 && ` Players with fewer than ${data.min_maps} maps are listed last, unranked.`}</p>
             </> : <p className="muted">The leaderboard fills in once matches are published.</p>}
           </section>
 

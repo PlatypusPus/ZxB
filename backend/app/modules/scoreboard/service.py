@@ -350,16 +350,18 @@ async def board(db: AsyncSession, published_only: bool = True) -> dict:
                             "mvp": mvp and mvp["display_name"], "players": players})
 
     pub_ids = {m.id: m.rounds_a + m.rounds_b for m in published}
+    # Player stats are for the auction tournament only: captains and bought players, on maps for their own team.
+    # Stand-in games for another team, and subs who aren't on a roster, never reach the leaderboard.
+    home = {p.id: tid for tid, v in (await lineups(db)).items() for p in v["players"]}
     stat_rows = [{"key": r.player_id, "rounds": pub_ids[r.match_id], **{k: getattr(r, k) for k in (
         "agent", "kills", "deaths", "assists", "score", "damage", "headshots", "bodyshots", "legshots",
-        "first_kills", "first_deaths")}} for r in rows if r.match_id in pub_ids and r.player_id]
+        "first_kills", "first_deaths")}} for r in rows
+        if r.match_id in pub_ids and r.player_id and home.get(r.player_id) == r.team_id]
     stats = list(aggregate(stat_rows).values())
-    last_team = {r.player_id: r.team_id for r in sorted(rows, key=lambda r: r.match_id) if r.match_id in pub_ids}
     for s in stats:
         p = people[s["key"]]
         s.update(role=p.role, display_name=p.display_name, riot_id=p.riot_id, card_url=p.card_url,
-                 card_wide_url=p.card_wide_url, agents=dict(s["agents"]),
-                 team=team_card(teams[last_team[s["key"]]]) if last_team.get(s["key"]) in teams else None)
+                 card_wide_url=p.card_wide_url, agents=dict(s["agents"]), team=team_card(teams[home[s["key"]]]))
     public = ("display_name", "riot_id", "role", "team", "games", "acs", "kd", "adr", "hs", "kills", "deaths", "assists",
               "first_kills", "first_deaths")
     leaders = [{k: l[k] for k in ("role", "display_name", "riot_id", "card_url", "team", "games", "acs", "kd")}

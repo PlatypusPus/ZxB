@@ -101,10 +101,14 @@ export function groupFinal(rows) {
 }
 export const qualify = rank => QUALIFY[Math.min(Math.floor(rank / 2), 2)]
 
-// seeds: {A1: 'Team name', ...} once the groups are final; until then the slot shows just "A1".
+// seeds: {A1: team, ...} once the groups are final. A seeded slot shows the logo and tag (full name on hover);
+// anything else ("A1" before the groups end, "Winner UB semi 1") is a muted placeholder.
+const Slot = ({ x, team }) => team
+  ? <span className="br-slot"><span className="br-seed mono">{x}</span><img src={team.logo_url} alt="" /><abbr className="br-tag" title={team.name}>{team.tag}</abbr></span>
+  : <span className="br-slot br-tbd">{/^[AB]\d$/.test(x) && <span className="br-seed mono">{x}</span>}<span>{/^[AB]\d$/.test(x) ? 'TBD' : x}</span></span>
 const Match = ({ title, a, b, seeds }) => (
-  <div className="br-match"><span className="mono muted">{title}</span>
-    {[a, b].map((x, i) => <span key={i}>{seeds?.[x] ? <><span className="mono muted">{x}</span> {seeds[x]}</> : x}</span>)}</div>
+  <div className="br-match"><span className="mono muted br-title">{title}</span>
+    {[a, b].map((x, i) => <Slot key={i} x={x} team={seeds?.[x]} />)}</div>
 )
 
 // 8-team double elimination: group 1st/2nd start in the upper bracket, 3rd/4th in the lower.

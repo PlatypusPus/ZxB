@@ -68,7 +68,7 @@ export default function Home() {
   const seeds = {}
   for (const g of ['A', 'B']) {
     const rows = standings.filter(t => t.group === g)
-    if (groupFinal(rows)) rows.forEach((t, i) => { seeds[g + (i + 1)] = t.name })
+    if (groupFinal(rows)) rows.forEach((t, i) => { seeds[g + (i + 1)] = t })
   }
 
   return (

@@ -736,9 +736,13 @@ textarea:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
 .bracket > .br-label:first-child + .br-col { grid-column: 2; }
 .br-col { display: grid; gap: 10px; }
 .br-match { display: grid; border: 1px solid var(--line); background: var(--base); }
-.br-match > * { padding: 6px 12px; }
-.br-match > span:not(:first-child) { border-top: 1px solid var(--line); }
-.br-match > .mono { font-size: 11px; padding-top: 6px; padding-bottom: 6px; }
+.br-title { font-size: 11px; padding: 6px 12px; background: var(--tile); }
+.br-slot { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; border-top: 1px solid var(--line); }
+.br-slot img { width: 26px; height: 26px; object-fit: cover; flex: none; background: var(--tile); }
+.br-seed { font-size: 11px; color: var(--muted); min-width: 2.2ch; }
+.br-tag { font: 400 22px/1 var(--display); letter-spacing: .04em; text-decoration: none; color: var(--ink); }
+.br-tbd { color: var(--muted); font-size: 13px; }
+.br-match:hover { border-color: var(--amber); }
 .br-gf { grid-column: 5; grid-row: 1 / span 4; }
 .br-gf .br-match { border-color: var(--pink); }
 @media (max-width: 800px) {

@@ -101,30 +101,86 @@ export function groupFinal(rows) {
 }
 export const qualify = rank => QUALIFY[Math.min(Math.floor(rank / 2), 2)]
 
-// seeds: {A1: team, ...} once the groups are final. A seeded slot shows the logo and tag (full name on hover);
-// anything else ("A1" before the groups end, "Winner UB semi 1") is a muted placeholder.
-const Slot = ({ x, team }) => team
-  ? <span className="br-slot"><span className="br-seed mono">{x}</span><img src={team.logo_url} alt="" /><abbr className="br-tag" title={team.name}>{team.tag}</abbr></span>
-  : <span className="br-slot br-tbd">{/^[AB]\d$/.test(x) && <span className="br-seed mono">{x}</span>}<span>{/^[AB]\d$/.test(x) ? 'TBD' : x}</span></span>
-const Match = ({ title, a, b, seeds }) => (
-  <div className="br-match"><span className="mono muted br-title">{title}</span>
-    {[a, b].map((x, i) => <Slot key={i} x={x} team={seeds?.[x]} />)}</div>
-)
+// Bracket seeds ("A1" -> team) from each finished group; a group still playing leaves its slots empty.
+export function seedsFrom(standings = []) {
+  const seeds = {}
+  for (const g of ['A', 'B']) {
+    const rows = standings.filter(t => t.group === g)
+    if (groupFinal(rows)) rows.forEach((t, i) => { seeds[g + (i + 1)] = t })
+  }
+  return seeds
+}
 
-// 8-team double elimination: group 1st/2nd start in the upper bracket, 3rd/4th in the lower.
-export const Bracket = ({ seeds }) => (
-  <section className="bracket" aria-label="Playoff bracket" data-build>
-    <p className="br-label mono">UPPER BRACKET</p>
-    <div className="br-col"><Match title="UB semi 1 · BO3" a="A1" b="B2" seeds={seeds} /><Match title="UB semi 2 · BO3" a="B1" b="A2" seeds={seeds} /></div>
-    <div className="br-col"><Match title="Upper final · BO3" a="Winner UB semi 1" b="Winner UB semi 2" /></div>
-    <p className="br-label mono">LOWER BRACKET</p>
-    <div className="br-col"><Match title="LB round 1 · BO1" a="A3" b="B4" seeds={seeds} /><Match title="LB round 1 · BO1" a="B3" b="A4" seeds={seeds} /></div>
-    <div className="br-col"><Match title="LB round 2 · BO3" a="Winner A3–B4" b="Loser UB semi 2" /><Match title="LB round 2 · BO3" a="Winner B3–A4" b="Loser UB semi 1" /></div>
-    <div className="br-col"><Match title="LB semifinal · BO3" a="Winner LB round 2" b="Winner LB round 2" /></div>
-    <div className="br-col"><Match title="Lower final · BO3" a="Winner LB semifinal" b="Loser upper final" /></div>
-    <div className="br-gf"><Match title="Grand final · BO5" a="Upper final winner" b="Lower final winner" /></div>
-  </section>
-)
+// The playoffs, as data. A side is a group seed ("A1") or the winner/loser of another match ("W:ub1", "L:ub2").
+// Results (Admin -> Bracket) are {key: 'a' | 'b'}; teams move on through the bracket from them.
+// [key, title, best of, side a, side b, name used in "Winner …" placeholders]
+export const MATCHES = [
+  ['ub1', 'UB semi 1', 3, 'A1', 'B2', 'UB semi 1'], ['ub2', 'UB semi 2', 3, 'B1', 'A2', 'UB semi 2'],
+  ['ubf', 'Upper final', 3, 'W:ub1', 'W:ub2', 'upper final'],
+  ['q', 'Qualifier', 1, 'A4', 'B5', 'A4–B5'],
+  ['lb1', 'LB round 1', 1, 'A3', 'B4', 'A3 match'], ['lb2', 'LB round 1', 1, 'B3', 'W:q', 'B3 match'],
+  ['lb3', 'LB round 2', 3, 'W:lb1', 'L:ub2', 'LB round 2 (1)'], ['lb4', 'LB round 2', 3, 'W:lb2', 'L:ub1', 'LB round 2 (2)'],
+  ['lbs', 'LB semifinal', 3, 'W:lb3', 'W:lb4', 'LB semifinal'],
+  ['lbf', 'Lower final', 3, 'W:lbs', 'L:ubf', 'lower final'],
+  ['gf', 'Grand final', 5, 'W:ubf', 'W:lbf', 'grand final'],
+]
+const BY_KEY = Object.fromEntries(MATCHES.map(m => [m[0], m]))
+
+// The team in a side, or null while it isn't decided yet.
+export function sideTeam(ref, seeds, results) {
+  if (!ref.includes(':')) return seeds[ref] || null
+  const [wl, k] = ref.split(':'), m = BY_KEY[k], won = results[k]
+  if (!won) return null
+  return sideTeam(m[(won === 'a') === (wl === 'W') ? 3 : 4], seeds, results)
+}
+const sideLabel = ref => ref.includes(':') ? `${ref[0] === 'W' ? 'Winner' : 'Loser'} ${BY_KEY[ref.slice(2)][5]}` : ref
+
+// Every result that depends on match k (directly or further on), so changing k can clear them.
+export function after(k) {
+  const out = new Set(), walk = key => MATCHES.forEach(m => {
+    if ((m[3].slice(2) === key || m[4].slice(2) === key) && !out.has(m[0])) { out.add(m[0]); walk(m[0]) }
+  })
+  walk(k)
+  return out
+}
+
+// A decided side shows the logo and tag (full name on hover); a seed slot before the groups end shows "TBD",
+// a later slot "Winner UB semi 1". onPick (admin only) makes each decided side a button that declares the winner.
+function Slot({ ref_, team, state, onPick }) {
+  const seed = !ref_.includes(':') && <span className="br-seed mono">{ref_}</span>
+  const body = team ? <>{seed}<img src={team.logo_url} alt="" /><abbr className="br-tag" title={team.name}>{team.tag}</abbr></>
+    : <>{seed}<span>{seed ? 'TBD' : sideLabel(ref_)}</span></>
+  const cls = 'br-slot' + (team ? '' : ' br-tbd') + (state ? ' br-' + state : '')
+  return onPick && team
+    ? <button type="button" className={cls} onClick={onPick} aria-pressed={state === 'won'} title={state === 'won' ? 'Click again to clear' : `${team.name} won`}>{body}</button>
+    : <span className={cls}>{body}</span>
+}
+
+function Match({ m: [k, title, bo, a, b], seeds, results, onPick }) {
+  const won = results[k]
+  return (
+    <div className="br-match"><span className="mono muted br-title">{title} · BO{bo}</span>
+      {[a, b].map((ref, i) => {
+        const side = 'ab'[i]
+        return <Slot key={side} ref_={ref} team={sideTeam(ref, seeds, results)} state={won && (won === side ? 'won' : 'lost')}
+          onPick={onPick && (() => onPick(k, won === side ? null : side))} />
+      })}</div>
+  )
+}
+
+// 8-team double elimination: group 1st/2nd start in the upper bracket, 3rd/4th in the lower (A4 via a qualifier).
+export function Bracket({ seeds = {}, results = {}, onPick }) {
+  const col = (keys, cls = 'br-col') => <div className={cls}>{keys.map(k => <Match key={k} m={BY_KEY[k]} seeds={seeds} results={results} onPick={onPick} />)}</div>
+  return (
+    <section className={'bracket' + (onPick ? ' br-admin' : '')} aria-label="Playoff bracket" data-build>
+      <p className="br-label mono">UPPER BRACKET</p>
+      {col(['ub1', 'ub2'])}{col(['ubf'])}
+      <p className="br-label mono">LOWER BRACKET</p>
+      {col(['q'], 'br-col br-qual')}{col(['lb1', 'lb2'])}{col(['lb3', 'lb4'])}{col(['lbs'])}{col(['lbf'])}
+      {col(['gf'], 'br-gf')}
+    </section>
+  )
+}
 
 // Every date comes from Admin -> Settings; playoff dates are TBA until they're scheduled.
 export function Schedule({ info, done, bracket = true }) {
@@ -136,7 +192,8 @@ export function Schedule({ info, done, bracket = true }) {
   const rows = [
     !done && [...dayCell(auction), 'Auction', 'Captains bid on registered players. Unsold players go again at half price.', ''],
     [...spanCell(g1, g2), 'Group stage', `${info?.teams ?? 12} teams in 2 groups of ${size}, single round robin: each team plays ${size - 1} matches, ${size * (size - 1)} in all.`, 'BO1'],
-    [...tba(), 'Lower round 1', 'A3 vs B4 and B3 vs A4. Losers are out.', 'BO1'],
+    [...tba(), 'Qualifier', 'A4 vs B5 for the last lower bracket spot.', 'BO1'],
+    [...tba(), 'Lower round 1', 'A3 vs B4, and B3 vs the qualifier winner. Losers are out.', 'BO1'],
     [...tba(), 'Upper semifinals', 'A1 vs B2 and B1 vs A2.', 'BO3'],
     [...tba(), 'Lower round 2', 'Lower round 1 winners vs the upper semifinal losers.', 'BO3'],
     [...tba(), 'Upper final + lower semifinal', '', 'BO3'],

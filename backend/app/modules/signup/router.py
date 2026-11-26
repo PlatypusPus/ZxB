@@ -43,7 +43,7 @@ async def public_info(db: AsyncSession = Depends(get_db)):
             "signups": signups, "leader_slots_left": max(0, s["teams"] - await approved_leaders(db)),
             "teams": s["teams"], "credits_per_team": s["credits_per_team"], "min_players": s["min_players"],
             "ranks": cfg["ranks"], "roles": cfg["roles"], "band_base_price": cfg["band_base_price"],
-            "terms_version": TERMS_VERSION}
+            "terms_version": TERMS_VERSION, "bracket": s.get("bracket") or {}}
 
 
 @router.get("/teams")

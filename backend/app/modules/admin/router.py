@@ -491,6 +491,21 @@ async def put_settings(body: dict, db: AsyncSession = Depends(get_db), admin: st
     return {"name": t.name, "status": t.status, "settings": t.settings}
 
 
+@router.put("/bracket")
+async def put_bracket(body: dict, db: AsyncSession = Depends(get_db), admin: str = Depends(require_admin)):
+    """Playoff results: {match key: "a" | "b"} for the side that won. The match keys live in the frontend Bracket;
+    the page clears later results itself when an earlier one changes. Not a setting, so the auction lock doesn't apply."""
+    results = body.get("results")
+    if not (isinstance(results, dict) and len(results) <= 20
+            and all(isinstance(k, str) and 0 < len(k) <= 8 and v in ("a", "b") for k, v in results.items())):
+        raise HTTPException(422, "results: {match: 'a' or 'b'}")
+    t, _ = await load(db, lock=True)
+    t.settings = {**t.settings, "bracket": results}
+    audit(db, admin, "bracket.changed", results=results)
+    await db.commit()
+    return {"bracket": results}
+
+
 @router.put("/settings/upi-qr")
 async def put_upi_qr(qr: UploadFile = File(...), db: AsyncSession = Depends(get_db), admin: str = Depends(require_admin)):
     """The QR players scan to pay. Stored as public media; the old image is deleted."""

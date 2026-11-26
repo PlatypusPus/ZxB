@@ -200,3 +200,12 @@ async def test_groups_split_the_standings(c):
     assert [(r["group"], r["id"]) for r in rows][:2] == [("A", 3), ("A", 4)] and {r["group"] for r in rows[2:]} == {"B"}
     assert [t["group"] for t in (await c.get("/api/v1/teams")).json()] == ["B", "B", "A", "A"]
     assert (await c.post("/api/v1/admin/teams/1/group", json={"group": "A"})).status_code == 401
+
+
+async def test_bracket_results_are_admin_only_and_public(c):
+    assert (await c.put("/api/v1/admin/bracket", json={"results": {"ub1": "a"}})).status_code == 401
+    bad = await c.put("/api/v1/admin/bracket", json={"results": {"ub1": "x"}}, headers=c.admin)
+    assert bad.status_code == 422
+    ok = await c.put("/api/v1/admin/bracket", json={"results": {"ub1": "a", "q": "b"}}, headers=c.admin)
+    assert ok.status_code == 200
+    assert (await c.get("/api/v1/public")).json()["bracket"] == {"ub1": "a", "q": "b"}

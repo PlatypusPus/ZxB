@@ -3,8 +3,9 @@ import { api } from './api.js'
 import { useAuction, useCountdown } from './live.js'
 import { MatchSummary, MatchTable } from './Scoreboard.jsx'
 import { MapCard } from './Veto.jsx'
+import { Bracket, after, seedsFrom } from './Layout.jsx'
 
-const TABS = ['Queue', 'Teams', 'Live', 'Veto', 'Scoreboard', 'Settings', 'Email', 'Payments', 'Audit']
+const TABS = ['Queue', 'Teams', 'Live', 'Veto', 'Scoreboard', 'Bracket', 'Settings', 'Email', 'Payments', 'Audit']
 const PATH = { leader: 'Captain', auction: 'Auction player', sub: 'Sub (free)' }
 
 export default function Admin() {
@@ -28,6 +29,7 @@ export default function Admin() {
       {!teamId && tab === 'Live' && <Live call={call} token={token} />}
       {!teamId && tab === 'Veto' && <VetoAdmin call={call} />}
       {!teamId && tab === 'Scoreboard' && <ScoreboardAdmin call={call} />}
+      {!teamId && tab === 'Bracket' && <BracketAdmin call={call} />}
       {!teamId && tab === 'Settings' && <Settings call={call} />}
       {!teamId && tab === 'Email' && <Announce call={call} />}
       {!teamId && tab === 'Payments' && <Payments token={token} />}
@@ -870,6 +872,31 @@ function Payments({ token }) {
 const flat = (o, pre = '') => Object.entries(o || {}).reduce((acc, [k, v]) =>
   v && typeof v === 'object' && !Array.isArray(v) ? { ...acc, ...flat(v, `${pre}${k}.`) }
     : { ...acc, [pre + k]: v == null ? '—' : String(v) }, {})
+
+// Playoff results: click the team that won. Changing a result clears every later result that depended on it.
+function BracketAdmin({ call }) {
+  const [seeds, setSeeds] = useState(null), [results, setResults] = useState({}), [err, setErr] = useState('')
+  useEffect(() => {
+    api('/scoreboard').then(d => setSeeds(seedsFrom(d.standings))).catch(e => setErr(e.message))
+    api('/public').then(d => setResults(d.bracket || {})).catch(e => setErr(e.message))
+  }, [])
+  const pick = async (k, side) => {
+    const next = { ...results }
+    after(k).forEach(x => delete next[x])
+    if (side) next[k] = side; else delete next[k]
+    setErr('')
+    try { setResults((await call('/admin/bracket', { method: 'PUT', body: { results: next } })).bracket) } catch (e) { setErr(e.message) }
+  }
+  if (!seeds) return <p className="muted">{err || 'Loading…'}</p>
+  return (
+    <section>
+      <p className="muted">Click the team that won a match. It moves on (and the loser drops) on the public bracket straight away.
+        Click the winner again to clear it. Changing a result clears the later results that depended on it.</p>
+      {err && <p className="err" role="alert">{err}</p>}
+      <Bracket seeds={seeds} results={results} onPick={pick} />
+    </section>
+  )
+}
 
 function Audit({ call }) {
   const [rows, setRows] = useState([])

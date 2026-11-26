@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from './api.js'
 import { TeamCard } from './Cards.jsx'
-import { Bracket, Footer, groupFinal, Nav, Schedule, SlotMeter, Ticker, dayCell, parseDay, spanCell, stage } from './Layout.jsx'
+import { Bracket, Footer, seedsFrom, Nav, Schedule, SlotMeter, Ticker, dayCell, parseDay, spanCell, stage } from './Layout.jsx'
 
 const FAQ = [
   ['What is ZenithXBeans?', 'A community that runs Valorant tournaments for players, by players.'],
@@ -64,12 +64,7 @@ export default function Home() {
   // Countdown: to the auction before it, to the playoffs after it.
   const next = done ? null : ['THE AUCTION', info?.event_date]
   const days = next && daysUntil(next[1])
-  // Bracket seeds ("A1" -> team name) from each finished group; a group still playing leaves its slots as "A1".
-  const seeds = {}
-  for (const g of ['A', 'B']) {
-    const rows = standings.filter(t => t.group === g)
-    if (groupFinal(rows)) rows.forEach((t, i) => { seeds[g + (i + 1)] = t })
-  }
+  const seeds = seedsFrom(standings)
 
   return (
     <>
@@ -167,8 +162,8 @@ export default function Home() {
 
         {done && <section className="wrap" id="bracket" data-section>
           <h2 className="display" data-decode>Playoff bracket</h2>
-          <p className="muted sched-lede">Group 1st and 2nd start in the upper bracket, 3rd and 4th in the lower. 5th and 6th are out.</p>
-          <Bracket seeds={seeds} />
+          <p className="muted sched-lede">Group 1st and 2nd start in the upper bracket, 3rd and 4th in the lower. A4 first plays B5 in a qualifier for its lower bracket spot.</p>
+          <Bracket seeds={seeds} results={info?.bracket} />
         </section>}
 
         {teams.length > 0 && <section className="wrap" id="teams" data-section>

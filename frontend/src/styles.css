@@ -730,10 +730,11 @@ textarea:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
 .sb-key span::before, .seeds li[class^="q-"] b::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 8px; background: var(--q); vertical-align: middle; }
 .seeds li[class^="q-"] b { color: var(--ink); min-width: 10ch; font-size: 16px; }
 .tp-group { display: inline-flex; align-items: center; gap: 10px; margin-top: 8px; }
-.bracket { margin-top: var(--t); display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px var(--t);
+.bracket { margin-top: var(--t); display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14px var(--t);
   background: var(--card); border: 1px solid var(--line); padding: 20px; align-items: center; }
-.br-label { grid-column: 1 / 5; margin: 0; color: var(--amber); font-size: 12px; letter-spacing: .12em; }
-.bracket > .br-label:first-child + .br-col { grid-column: 2; }
+.br-label { grid-column: 1 / 6; margin: 0; color: var(--amber); font-size: 12px; letter-spacing: .12em; }
+.bracket > .br-label:first-child + .br-col { grid-column: 3; }
+.br-qual { align-self: end; }   /* level with the B3 match it feeds */
 .br-col { display: grid; gap: 10px; }
 .br-match { display: grid; border: 1px solid var(--line); background: var(--base); }
 .br-title { font-size: 11px; padding: 6px 12px; background: var(--tile); }
@@ -743,7 +744,12 @@ textarea:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
 .br-tag { font: 400 22px/1 var(--display); letter-spacing: .04em; text-decoration: none; color: var(--ink); }
 .br-tbd { color: var(--muted); font-size: 13px; }
 .br-match:hover { border-color: var(--amber); }
-.br-gf { grid-column: 5; grid-row: 1 / span 4; }
+.br-won .br-tag { color: var(--amber); }
+.br-lost { opacity: .45; }
+button.br-slot { width: 100%; font: inherit; color: inherit; text-align: left; background: none; border: 0; border-top: 1px solid var(--line); cursor: pointer; }
+button.br-slot:hover { background: var(--tile); }
+button.br-slot:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
+.br-gf { grid-column: 6; grid-row: 1 / span 4; }
 .br-gf .br-match { border-color: var(--pink); }
 @media (max-width: 800px) {
   .bracket { grid-template-columns: 1fr; }

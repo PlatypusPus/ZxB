@@ -118,7 +118,7 @@ export const Bracket = ({ seeds }) => (
     <div className="br-col"><Match title="LB round 2 · BO3" a="Winner A3–B4" b="Loser UB semi 2" /><Match title="LB round 2 · BO3" a="Winner B3–A4" b="Loser UB semi 1" /></div>
     <div className="br-col"><Match title="LB semifinal · BO3" a="Winner LB round 2" b="Winner LB round 2" /></div>
     <div className="br-col"><Match title="Lower final · BO3" a="Winner LB semifinal" b="Loser upper final" /></div>
-    <div className="br-gf"><Match title="Grand final · BO3" a="Upper final winner" b="Lower final winner" /></div>
+    <div className="br-gf"><Match title="Grand final · BO5" a="Upper final winner" b="Lower final winner" /></div>
   </section>
 )
 
@@ -137,7 +137,7 @@ export function Schedule({ info, done, bracket = true }) {
     [...tba(), 'Lower round 2', 'Lower round 1 winners vs the upper semifinal losers.', 'BO3'],
     [...tba(), 'Upper final + lower semifinal', '', 'BO3'],
     [...tba(), 'Lower final', 'Lower semifinal winner vs the upper final loser.', 'BO3'],
-    [...tba(), 'Grand final', '', 'BO3'],
+    [...tba(), 'Grand final', '', 'BO5'],
   ].filter(Boolean)
   return (
     <>

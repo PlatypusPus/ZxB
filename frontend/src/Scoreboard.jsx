@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from './api.js'
-import { Footer, Nav, qualify } from './Layout.jsx'
+import { Footer, Nav, groupFinal, qualify } from './Layout.jsx'
 
 // ⓘ button next to a section title. <details> needs no JS and works with keyboard and screen readers.
 export function Info({ label, children }) {
@@ -133,11 +133,11 @@ export default function Scoreboard() {
                 <li><b>Pts</b>: points. A win is 3, a loss by 3 rounds or fewer (including overtime) is 1, a bigger loss is 0.</li>
               </ul>
               <p>Ties are split by RD, then rounds won, then the result between the two teams. Teams yet to play are listed last.</p>
-              <p>When a group finishes, 1st and 2nd go to the upper bracket, 3rd and 4th to the play-in, and 5th and 6th are out.</p>
+              <p>When a group finishes, 1st and 2nd go to the upper bracket, 3rd and 4th to the lower bracket, and 5th and 6th are out.</p>
             </Head>
             {[...new Set(data.standings.map(t => t.group || ''))].map(g => {
               const rows = data.standings.filter(t => (t.group || '') === g)
-              const final = g && rows.every(t => t.p >= rows.length - 1)   // no "eliminated" until the group is over
+              const final = g && groupFinal(rows)   // no "eliminated" until the group is over
               return <div className="table-wrap" key={g}>
               <table className="sb-table sb-standings">
                 {g && <caption>Group {g}</caption>}
@@ -156,7 +156,7 @@ export default function Scoreboard() {
                 ))}</tbody>
               </table>
               {g && !final && <p className="sb-key mono muted">{rows.reduce((n, t) => n + t.p, 0) / 2} of {rows.length * (rows.length - 1) / 2} matches played. Qualification is set when the group ends.</p>}
-              {final && <p className="sb-key mono muted">{[['ub', '1st & 2nd · Upper bracket'], ['pi', '3rd & 4th · Play-in'], ['out', '5th & 6th · Out']].map(([k, w]) => <span key={k} className={'q-' + k}>{w}</span>)}</p>}
+              {final && <p className="sb-key mono muted">{[['ub', '1st & 2nd · Upper bracket'], ['lb', '3rd & 4th · Lower bracket'], ['out', '5th & 6th · Out']].map(([k, w]) => <span key={k} className={'q-' + k}>{w}</span>)}</p>}
             </div>
             })}
           </section>

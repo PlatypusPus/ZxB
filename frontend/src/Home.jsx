@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from './api.js'
 import { TeamCard } from './Cards.jsx'
-import { Footer, Nav, Schedule, SlotMeter, Ticker, dayCell, parseDay, spanCell, stage } from './Layout.jsx'
+import { Bracket, Footer, groupFinal, Nav, Schedule, SlotMeter, Ticker, dayCell, parseDay, spanCell, stage } from './Layout.jsx'
 
 const FAQ = [
   ['What is ZenithXBeans?', 'A community that runs Valorant tournaments for players, by players.'],
@@ -47,9 +47,11 @@ function RankLadder({ bands }) {
 export default function Home() {
   const [info, setInfo] = useState(null)
   const [teams, setTeams] = useState([])
+  const [standings, setStandings] = useState([])
   useEffect(() => {
     api('/public').then(setInfo).catch(() => {})
     api('/teams').then(setTeams).catch(() => {})
+    api('/scoreboard').then(d => setStandings(d.standings)).catch(() => {})
   }, [])
   const open = info?.registration_open
   const done = stage(info)   // null until the auction is completed
@@ -62,6 +64,12 @@ export default function Home() {
   // Countdown: to the auction before it, to the playoffs after it.
   const next = done ? null : ['THE AUCTION', info?.event_date]
   const days = next && daysUntil(next[1])
+  // Bracket seeds ("A1" -> team name) from each finished group; a group still playing leaves its slots as "A1".
+  const seeds = {}
+  for (const g of ['A', 'B']) {
+    const rows = standings.filter(t => t.group === g)
+    if (groupFinal(rows)) rows.forEach((t, i) => { seeds[g + (i + 1)] = t.name })
+  }
 
   return (
     <>
@@ -76,7 +84,7 @@ export default function Home() {
           <div className="hero-deck">
             <div className="hero-pitch">
               <h2 className="display">{done ? <>Auction <span className="pink">Cup</span></> : <>Valorant <span className="pink">Auction</span></>}</h2>
-              {done ? <p>{info?.teams ?? 10} teams, two groups, one map against every team in the group{groups[0] !== 'TBA' ? `, ${groups[0]} ${groups[1][0] + groups[1].slice(1).toLowerCase()}` : ''}. Follow every result on the scoreboard.</p>
+              {done ? <p>The group stage is over. 8 of {info?.teams ?? 10} teams go on to a double elimination playoff{playoffs ? ` from ${short(playoffs)}` : ''}. See the bracket below and every result on the scoreboard.</p>
               : <p>{info?.teams ?? 10} captains, {info?.credits_per_team ?? 1000} credits each. Every player goes under the hammer live{auction ? `, on ${auction.weekday} ${auction.day} ${auction.mon[0] + auction.mon.slice(1).toLowerCase()}` : ''}, then the teams fight it out{groups[0] !== 'TBA' ? `: group stage ${groups[0]} ${groups[1][0] + groups[1].slice(1).toLowerCase()}` : ''}{playoffs ? `, playoffs from ${short(playoffs)}` : ''}.</p>}
               {done && <div className="actions">
                 <a className="btn" href="/scoreboard">Scoreboard</a>
@@ -94,14 +102,14 @@ export default function Home() {
                 <span className="mono">{days === 0 ? 'AUCTION IS TODAY' : `${days === 1 ? 'DAY' : 'DAYS'} TO ${next[0]}`}</span>
               </p>}
               {done ? <p className="hero-days">
-                <b className="digits">{groups[0]}</b>
-                <span className="mono">{groups[1]} · GROUP STAGE</span>
+                <b className="digits">{dayCell(playoffs)[0]}</b>
+                <span className="mono">{playoffs ? `${playoffs.mon} ONWARDS · PLAYOFFS` : 'PLAYOFFS'}</span>
               </p> : <ol className="hero-dates">
                 <li><b className="digits">{auction?.day || 'TBA'}</b><span className="mono muted">{auction ? `${auction.mon} · ${auction.weekday.slice(0, 3).toUpperCase()}` : 'DATE'}</span><span>Auction</span></li>
                 <li><b className="digits">{groups[0]}</b><span className="mono muted">{groups[1]}</span><span>Group stage</span></li>
                 <li><b className="digits">{dayCell(playoffs)[0]}</b><span className="mono muted">{playoffs ? `${playoffs.mon} ONWARDS` : 'DATE'}</span><span>Playoffs</span></li>
               </ol>}
-              {done ? <p className="mono"><span className="amber">{info?.teams ?? 10} TEAMS</span> · 2 GROUPS · BO1</p>
+              {done ? <p className="mono"><span className="amber">8 TEAMS</span> · DOUBLE ELIMINATION</p>
                 : <p className="mono"><span className="amber">{info?.leader_slots_left ?? '–'}</span> OF {info?.teams ?? 10} TEAM SLOTS OPEN</p>}
             </aside>
           </div>
@@ -157,6 +165,12 @@ export default function Home() {
           </article>
         </section>
 
+        {done && <section className="wrap" id="bracket" data-section>
+          <h2 className="display" data-decode>Playoff bracket</h2>
+          <p className="muted sched-lede">Group 1st and 2nd start in the upper bracket, 3rd and 4th in the lower. 5th and 6th are out.</p>
+          <Bracket seeds={seeds} />
+        </section>}
+
         {teams.length > 0 && <section className="wrap" id="teams" data-section>
           <h2 className="display" data-decode>{teams.some(t => t.group) ? 'Groups' : 'Teams'}</h2>
           {teams.some(t => t.group) ? ['A', 'B', null].map(g => {
@@ -171,7 +185,7 @@ export default function Home() {
         <section className="wrap" id="schedule" data-section>
           <h2 className="display" data-decode>{done ? 'Format and rough schedule' : 'Schedule'}</h2>
           {done && <p className="muted sched-lede">A rough guide. Captains agree their match times, so exact dates move around.</p>}
-          <Schedule info={info} done={!!done} />
+          <Schedule info={info} done={!!done} bracket={!done} />
         </section>
 
         {!done && <section className="wrap" data-section>

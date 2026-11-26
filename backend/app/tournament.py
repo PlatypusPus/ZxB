@@ -62,6 +62,14 @@ async def init_db() -> None:
         for grp, names in GROUPS.items():
             await c.execute(text("UPDATE team SET grp = :g WHERE grp IS NULL AND "
                                  "regexp_replace(lower(name), '[^a-z0-9]', '', 'g') = ANY(:n)"), {"g": grp, "n": names})
+        # ponytail: one-off forfeit (27 Nov): Raaje forfeited to Tooth Monsters in group B, scored 13-0 with no player
+        # stats. Deleting it in Admin brings it back on restart; drop this block after the playoffs.
+        await c.execute(text(
+            "INSERT INTO game_match (tournament_id, henrik_match_id, map, team_a_id, team_b_id, rounds_a, rounds_b, status) "
+            "SELECT 1, 'forfeit:raaje-toothmonsters', 'Forfeit', a.id, b.id, 0, 13, 'published' FROM team a, team b "
+            "WHERE regexp_replace(lower(a.name), '[^a-z0-9]', '', 'g') = 'raaje' "
+            "AND regexp_replace(lower(b.name), '[^a-z0-9]', '', 'g') = 'toothmonsters' "
+            "ON CONFLICT (henrik_match_id) DO NOTHING"))
         await c.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_player_auth ON player (tournament_id, auth_provider, auth_sub) "
                              "WHERE auth_sub IS NOT NULL AND status NOT IN ('rejected', 'withdrawn')"))
     async with Session() as db:

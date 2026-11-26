@@ -75,7 +75,7 @@ export function Count({ value, prefix = '' }) {
 // "15 Nov 2026" -> { day: '15', mon: 'NOV', weekday: 'Sunday', date }, or null if it can't be read.
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
 // After the auction: which part of the tournament is on, from the dates in Settings.
-export const stage = info => info?.status === 'completed' ? 'GROUP STAGE' : null   // ponytail: add PLAYOFFS once they're scheduled
+export const stage = info => info?.status === 'completed' ? 'PLAYOFFS' : null
 
 export function parseDay(text) {
   const [d, m, y] = (text || '').split(' '), mi = MONTHS.indexOf((m || '').slice(0, 3).toLowerCase())
@@ -91,16 +91,39 @@ export function spanCell(from, to) {
   if (!from || !to) return dayCell(from || to)
   return from.mon === to.mon ? [`${from.day}–${to.day}`, from.mon] : [`${from.day}–${to.day}`, `${from.mon}–${to.mon}`]
 }
-// Where each group finish goes (Auction Cup playoffs format, 19 Nov).
-export const QUALIFY = [['1st & 2nd', 'Upper bracket', 'ub'], ['3rd & 4th', 'Play-in', 'pi'], ['5th & 6th', 'Eliminated', 'out']]
+// Where each group finish goes (Auction Cup playoffs format, updated 27 Nov).
+export const QUALIFY = [['1st & 2nd', 'Upper bracket', 'ub'], ['3rd & 4th', 'Lower bracket', 'lb'], ['5th & 6th', 'Eliminated', 'out']]
+// A group is over when every team that has played has met all the others. A team with no matches while the rest
+// finished (Bhadwa Yojna Centre, Group A) counts as withdrawn and ranks last.
+export function groupFinal(rows) {
+  const active = rows.filter(t => t.p > 0)
+  return active.length >= rows.length - 1 && active.length > 1 && active.every(t => t.p >= active.length - 1)
+}
 export const qualify = rank => QUALIFY[Math.min(Math.floor(rank / 2), 2)]
 
-const Match = ({ title, a, b }) => (
-  <div className="br-match"><span className="mono muted">{title}</span><span>{a}</span><span>{b}</span></div>
+// seeds: {A1: 'Team name', ...} once the groups are final; until then the slot shows just "A1".
+const Match = ({ title, a, b, seeds }) => (
+  <div className="br-match"><span className="mono muted">{title}</span>
+    {[a, b].map((x, i) => <span key={i}>{seeds?.[x] ? <><span className="mono muted">{x}</span> {seeds[x]}</> : x}</span>)}</div>
+)
+
+// 8-team double elimination: group 1st/2nd start in the upper bracket, 3rd/4th in the lower.
+export const Bracket = ({ seeds }) => (
+  <section className="bracket" aria-label="Playoff bracket" data-build>
+    <p className="br-label mono">UPPER BRACKET</p>
+    <div className="br-col"><Match title="UB semi 1 · BO3" a="A1" b="B2" seeds={seeds} /><Match title="UB semi 2 · BO3" a="B1" b="A2" seeds={seeds} /></div>
+    <div className="br-col"><Match title="Upper final · BO3" a="Winner UB semi 1" b="Winner UB semi 2" /></div>
+    <p className="br-label mono">LOWER BRACKET</p>
+    <div className="br-col"><Match title="LB round 1 · BO1" a="A3" b="B4" seeds={seeds} /><Match title="LB round 1 · BO1" a="B3" b="A4" seeds={seeds} /></div>
+    <div className="br-col"><Match title="LB round 2 · BO3" a="Winner A3–B4" b="Loser UB semi 2" /><Match title="LB round 2 · BO3" a="Winner B3–A4" b="Loser UB semi 1" /></div>
+    <div className="br-col"><Match title="LB semifinal · BO3" a="Winner LB round 2" b="Winner LB round 2" /></div>
+    <div className="br-col"><Match title="Lower final · BO3" a="Winner LB semifinal" b="Loser upper final" /></div>
+    <div className="br-gf"><Match title="Grand final · BO3" a="Upper final winner" b="Lower final winner" /></div>
+  </section>
 )
 
 // Every date comes from Admin -> Settings; playoff dates are TBA until they're scheduled.
-export function Schedule({ info, done }) {
+export function Schedule({ info, done, bracket = true }) {
   const auction = parseDay(info?.event_date), g1 = parseDay(info?.group_start), g2 = parseDay(info?.group_end)
   const size = info?.teams ? info.teams / 2 : 6
   // During the group stage the playoffs have no dates yet: show their order instead of a row of TBAs.
@@ -109,11 +132,12 @@ export function Schedule({ info, done }) {
   const rows = [
     !done && [...dayCell(auction), 'Auction', 'Captains bid on registered players. Unsold players go again at half price.', ''],
     [...spanCell(g1, g2), 'Group stage', `${info?.teams ?? 12} teams in 2 groups of ${size}, single round robin: each team plays ${size - 1} matches, ${size * (size - 1)} in all.`, 'BO1'],
-    [...tba(), 'Play-in', 'A3 vs B4 and B3 vs A4, single elimination. Winners go to the lower bracket.', 'BO3'],
+    [...tba(), 'Lower round 1', 'A3 vs B4 and B3 vs A4. Losers are out.', 'BO1'],
     [...tba(), 'Upper semifinals', 'A1 vs B2 and B1 vs A2.', 'BO3'],
-    [...tba(), 'Lower round 1', 'Play-in winners vs the upper semifinal losers.', 'BO3'],
-    [...tba(), 'Upper final + lower final', '', 'BO3'],
-    [...tba(), 'Grand final', '', 'BO5'],
+    [...tba(), 'Lower round 2', 'Lower round 1 winners vs the upper semifinal losers.', 'BO3'],
+    [...tba(), 'Upper final + lower semifinal', '', 'BO3'],
+    [...tba(), 'Lower final', 'Lower semifinal winner vs the upper final loser.', 'BO3'],
+    [...tba(), 'Grand final', '', 'BO3'],
   ].filter(Boolean)
   return (
     <>
@@ -130,19 +154,10 @@ export function Schedule({ info, done }) {
         <section className="seeds" aria-labelledby="seeds-h">
           <h3 id="seeds-h">From each group</h3>
           <ol>{QUALIFY.map(([place, where, k]) => <li key={k} className={'q-' + k}><b className="digits">{place}</b> {where}</li>)}</ol>
-          <p className="muted">The playoffs are a 6-team double elimination: 4 teams start in the upper bracket, 2 come in from the play-in.</p>
+          <p className="muted">The playoffs are an 8-team double elimination: 4 teams start in the upper bracket, 4 in the lower.</p>
         </section>
       </div>
-      <section className="bracket" aria-label="Playoff bracket" data-build>
-        <p className="br-label mono">UPPER BRACKET</p>
-        <div className="br-col"><Match title="UB 1 · BO3" a="A1" b="B2" /><Match title="UB 2 · BO3" a="B1" b="A2" /></div>
-        <div className="br-col"><Match title="Upper final · BO3" a="Winner UB 1" b="Winner UB 2" /></div>
-        <p className="br-label mono">PLAY-IN → LOWER BRACKET</p>
-        <div className="br-col"><Match title="Play-in 1 · BO3" a="A3" b="B4" /><Match title="Play-in 2 · BO3" a="B3" b="A4" /></div>
-        <div className="br-col"><Match title="LB 1 · BO3" a="Play-in winner 1" b="Loser UB 1" /><Match title="LB 2 · BO3" a="Play-in winner 2" b="Loser UB 2" /></div>
-        <div className="br-col"><Match title="Lower final · BO3" a="Winner LB 1" b="Winner LB 2" /></div>
-        <div className="br-gf"><Match title="Grand final · BO5" a="Upper final winner" b="Lower final winner" /></div>
-      </section>
+      {bracket && <Bracket />}
     </>
   )
 }

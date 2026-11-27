@@ -183,10 +183,22 @@ def rank_players(stats: list[dict], base: float | None = None) -> list[dict]:
     return sorted(rated, key=lambda s: (-s["rating"], -s["kd"]))
 
 
-def role_leaders(by_role: list[dict], base: float) -> list[dict]:
-    """by_role: one row per (player, role played), from only the maps on that role's agents. Top rated in each."""
-    ranked = rank_players(by_role, base)
-    return [best for role in ROLES if (best := next((s for s in ranked if s["role"] == role), None))]
+FLEX_MIN_ROLES = 4   # NTG's rule: Flex means at least one agent in every role
+
+
+def role_leaders(by_role: list[dict], stats: list[dict], base: float) -> list[dict]:
+    """NTG's awards. by_role: one row per (player, role played), from only the maps on that role's agents; stats: one
+    row per player, role "Flex" for those who played every role. Flex is awarded first on the whole record, and each
+    player wins at most one card, so a role card goes to the next best player not already holding one."""
+    flex = next(iter(rank_players([s for s in stats if s["role"] == "Flex"], base)), None)
+    claimed = {flex["id"]} if flex else set()
+    ranked, out = rank_players(by_role, base), []
+    for role in ROLES:
+        best = next((s for s in ranked if s["role"] == role and s["id"] not in claimed), None)
+        if best:
+            claimed.add(best["id"])
+            out.append(best)
+    return out + ([flex] if flex else [])
 
 
 def top_agents(agents: Counter, n: int = 3) -> list[list]:
@@ -406,9 +418,14 @@ async def board(db: AsyncSession, published_only: bool = True) -> dict:
     stats = list(aggregate(stat_rows).values())
     # The same maps split by the role of the agent played: "best Duelist" counts only their Duelist maps.
     by_role = list(aggregate([{**r, "key": (r["key"], r["role"])} for r in stat_rows]).values())
-    main_role = {}
+    main_role, spread = {}, {}
     for s in sorted(by_role, key=lambda s: s["games"]):
         main_role[s["key"][0]] = s["key"][1]     # most maps wins (ties: the later, arbitrary)
+        if s["key"][1] in ROLES:
+            spread.setdefault(s["key"][0], set()).add(s["key"][1])
+    for pid, roles in spread.items():
+        if len(roles) >= FLEX_MIN_ROLES:
+            main_role[pid] = "Flex"
     for s in stats + by_role:
         pid = s["key"][0] if isinstance(s["key"], tuple) else s["key"]
         p = people[pid]
@@ -421,11 +438,11 @@ async def board(db: AsyncSession, published_only: bool = True) -> dict:
     # Each role's best agent per player: rated like the leaderboard, so one lucky map on an agent doesn't win it.
     by_agent = rank_players(list(aggregate([{**r, "key": (r["key"], r["role"], r["agent"])}
                                             for r in stat_rows if r["agent"]]).values()), base)
-    for s in by_role:
-        best = next((a for a in by_agent if a["key"][:2] == s["key"]), None)
+    for s in by_role + stats:   # a player's overall best agent (any role) goes on the Flex card
+        best = next((a for a in by_agent if (a["key"][:2] if isinstance(s["key"], tuple) else a["key"][0]) == s["key"]), None)
         s["best_agent"] = best and {"agent": best["key"][2], "acs": best["acs"], "games": best["games"]}
     leaders = [{k: l[k] for k in ("role", "agents", "best_agent", "display_name", "riot_id", "card_url", "team", "games", "rating", "acs", "kd")}
-               for l in role_leaders(by_role, base)]
+               for l in role_leaders(by_role, stats, base)]
     players = [{k: p[k] for k in public} for p in rank_players(stats, base)]
     players_by_role = [{k: p[k] for k in public} for p in rank_players(by_role, base)]
     cards = [team_card(t) for t in approved.values()]

@@ -55,7 +55,7 @@ export function MatchSummary({ m }) {
 
 const STATS = [['rating', 'Rating', 'ACS adjusted for maps played: fewer maps pull it down'], ['acs', 'ACS', 'Average combat score per round'], ['kd', 'K/D', 'Kills per death'], ['adr', 'ADR', 'Average damage per round'],
   ['kills', 'K', 'Kills'], ['deaths', 'D', 'Deaths'], ['assists', 'A', 'Assists'], ['hs', 'HS%', 'Headshot percentage'], ['first_kills', 'FK', 'First kills']]
-const ROLES = ['All', 'Duelist', 'Initiator', 'Controller', 'Sentinel']
+const ROLES = ['All', 'Duelist', 'Initiator', 'Controller', 'Sentinel', 'Flex']
 // Agent portraits (from NTG, plus Hush) in /public/agents; an agent without one shows its initials.
 const PORTRAITS = new Set(['astra', 'breach', 'brimstone', 'chamber', 'clove', 'cypher', 'deadlock', 'fade', 'gekko', 'harbor', 'iso',
   'jett', 'kayo', 'killjoy', 'miks', 'neon', 'omen', 'phoenix', 'raze', 'reyna', 'sage', 'skye', 'sova', 'tejo', 'veto', 'viper',
@@ -84,12 +84,13 @@ function RatingMaths({ r }) {
   </>
 }
 
-// All: one row per player (main role = the role of most maps). A role: only maps on that role's agents.
+// All: one row per player (main role = the role of most maps, or Flex). A role: only maps on that role's agents.
+// Flex: players who played every role, on their whole record.
 function Leaderboard({ players, byRole }) {
   const [role, setRole] = useState('All')
   const [sort, setSort] = useState('rating')
   const dir = sort === 'deaths' ? 1 : -1      // fewest deaths first
-  const rows = (role === 'All' ? players : byRole.filter(p => p.role === role))
+  const rows = (role === 'All' ? players : role === 'Flex' ? players.filter(p => p.role === 'Flex') : byRole.filter(p => p.role === role))
     .sort((x, y) => dir * (x[sort] - y[sort]) || y.rating - x.rating)
   return (
     <>
@@ -185,7 +186,8 @@ export default function Scoreboard() {
                 <li><b>HS%</b>: share of hits that were headshots</li>
                 <li><b>FK</b>: rounds where they got the first kill</li>
               </ul>
-              <p>Everyone who has played a map is ranked. Roles come from the agents played: pick a role to see only the maps each player played on that role's agents. Under All, a player's role is the one they played most, and the agents listed are the ones they played most.</p>
+              <p>Everyone who has played a map is ranked. Roles come from the agents played: pick a role to see only the maps each player played on that role's agents. Under All, a player's role is the one they played most, and the agents listed are the ones they played most. Anyone who has played at least one agent in every role is <b>Flex</b>, ranked on all their maps.</p>
+              <p>Each player can top only one card. Flex is picked first, so a Flex winner's role card goes to the next best player.</p>
               {data.rating && <RatingMaths r={data.rating} />}
             </Head>
             {data.players.length ? <>

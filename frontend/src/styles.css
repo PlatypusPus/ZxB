@@ -657,7 +657,7 @@ textarea:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
 .sb-standings .digits { font-size: 20px; }
 .sb-standings td { vertical-align: middle; }
 .sb-standings td:nth-child(n+3), .sb-standings th:nth-child(n+3) { text-align: right; }
-.sb-leaders { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.sb-leaders { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
 .sb-leaders:focus-visible { outline: 2px solid var(--amber); outline-offset: 4px; }
 /* The Valorant card art is the card: full bleed, name on a scrim, stats on a solid plate so they always read. */
 .sb-leader { position: relative; isolation: isolate; display: flex; flex-direction: column; justify-content: flex-end; min-height: 27rem; overflow: hidden;

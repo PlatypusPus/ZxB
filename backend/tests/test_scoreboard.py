@@ -61,9 +61,14 @@ def test_everyone_is_ranked_but_few_maps_pull_the_rating_down():
     assert ranked[5]["rating"] > ranked[1]["rating"]          # same ACS, more maps ranks higher
     assert ranked[3]["rating"] < ranked[3]["acs"] - 150       # one hot map is heavily discounted
     assert [s["key"] for s in service.rank_players(stats)][-1] == 4
-    by_role = [{**s, "key": (s["key"], s["role"])} for s in stats]
-    leaders = service.role_leaders(by_role, service.baseline(stats))
-    assert {l["role"]: l["key"][0] for l in leaders} == {"Duelist": 3, "Initiator": 5, "Sentinel": 4}
+    by_role = [{**s, "id": s["key"], "key": (s["key"], s["role"])} for s in stats]
+    overall = [{**s, "id": s["key"]} for s in stats]
+    leaders = service.role_leaders(by_role, overall, service.baseline(stats))
+    assert {l["role"]: l["id"] for l in leaders} == {"Duelist": 3, "Initiator": 5, "Sentinel": 4}
+    # NTG's Flex: played every role; awarded first, and its holder can't also take a role card
+    next(s for s in overall if s["id"] == 3)["role"] = "Flex"
+    leaders = service.role_leaders(by_role, overall, service.baseline(stats))
+    assert {l["role"]: l["id"] for l in leaders} == {"Duelist": 2, "Initiator": 5, "Sentinel": 4, "Flex": 3}
 
 
 def test_only_the_first_map_between_group_rivals_is_group_stage():

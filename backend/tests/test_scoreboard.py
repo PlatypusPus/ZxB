@@ -61,7 +61,16 @@ def test_everyone_is_ranked_but_few_maps_pull_the_rating_down():
     assert ranked[5]["rating"] > ranked[1]["rating"]          # same ACS, more maps ranks higher
     assert ranked[3]["rating"] < ranked[3]["acs"] - 150       # one hot map is heavily discounted
     assert [s["key"] for s in service.rank_players(stats)][-1] == 4
-    assert {l["role"]: l["key"] for l in service.role_leaders(stats)} == {"Duelist": 3, "Initiator": 5, "Sentinel": 4}
+    by_role = [{**s, "key": (s["key"], s["role"])} for s in stats]
+    leaders = service.role_leaders(by_role, service.baseline(stats))
+    assert {l["role"]: l["key"][0] for l in leaders} == {"Duelist": 3, "Initiator": 5, "Sentinel": 4}
+
+
+def test_only_the_first_map_between_group_rivals_is_group_stage():
+    grp = {1: "A", 2: "A", 3: "B"}
+    ms = [{"id": 1, "team_a_id": 1, "team_b_id": 2, "started_at": 5}, {"id": 2, "team_a_id": 2, "team_b_id": 1, "started_at": 9},
+          {"id": 3, "team_a_id": 1, "team_b_id": 3, "started_at": 9}, {"id": 4, "team_a_id": 3, "team_b_id": 2, "started_at": None}]
+    assert [m["id"] for m in service.group_maps(ms, grp)] == [1]       # 2: a playoff rematch, 3/4: cross-group
 
 
 def test_teams_yet_to_play_sit_below_teams_that_have():
@@ -150,6 +159,7 @@ async def test_admin_finds_imports_and_publishes_a_match(c, monkeypatch):
     assert pub["standings"][1]["pts"] == 1   # 11-13 is a close loss
     leaders = {l["role"]: l for l in pub["role_leaders"]}
     assert leaders["Duelist"]["display_name"] == "P0" and leaders["Duelist"]["card_url"].endswith("large.png")
+    assert leaders["Duelist"]["best_agent"]["agent"] and leaders["Duelist"]["best_agent"]["games"] == 1
     assert pub["players"][0]["display_name"] == "P0" and pub["players"][0]["rating"] > 0
     assert pub["rating"]["rounds"] == service.BASELINE_ROUNDS and pub["rating"]["baseline"] > 0
     assert "phone" not in str(pub) and "9000000000" not in str(pub)
@@ -160,6 +170,16 @@ async def test_admin_finds_imports_and_publishes_a_match(c, monkeypatch):
     pub = (await c.get("/api/v1/scoreboard")).json()
     assert {p["display_name"]: p["games"] for p in pub["players"]} == {"P0": 1, "P1": 1}
     assert pub["matches"][0]["players"] and len(pub["matches"][0]["players"]) == 5   # match table still shows everyone
+
+    # P3 becomes team 2's playoff sub: their map for team 2 now counts
+    from app.core import Session
+    from app.models import Player
+    async with Session() as db:
+        (await db.get(Player, 4)).sub_team_id = 2
+        await db.commit()
+    pub = (await c.get("/api/v1/scoreboard")).json()
+    assert {p["display_name"]: p["games"] for p in pub["players"]} == {"P0": 1, "P1": 1, "P3": 1}
+    assert all(p["agents"] and p["role"] for p in pub["players"])
 
     # a published match can't be overwritten by a re-import
     assert (await c.post(S + "/import", json={**lineup, "match_id": "M1"}, headers=c.admin)).status_code == 409

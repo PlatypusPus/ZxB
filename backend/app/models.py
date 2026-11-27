@@ -55,6 +55,7 @@ class Player(Base):
     puuid: Mapped[str | None] = mapped_column(String(80), index=True)   # Riot account id, resolved via Henrik
     card_url: Mapped[str | None] = mapped_column(String(200))           # Valorant player card art (portrait)
     card_wide_url: Mapped[str | None] = mapped_column(String(200))
+    sub_team_id: Mapped[int | None] = mapped_column(Integer)   # playoff sub: also plays for this team (team.id)
     current_rank_tier: Mapped[int] = mapped_column(Integer)
     peak_rank_tier: Mapped[int] = mapped_column(Integer)
     role: Mapped[str] = mapped_column(String(16))

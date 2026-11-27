@@ -44,6 +44,13 @@ GROUPS = {"A": ["ravanaesports", "ravananesports", "teamnextera", "nextera", "at
           "B": ["thekaalabilla", "kaalabilla", "kaalabillas", "godsowngamers", "meowdiff", "raaje", "toothmonsters",
                 "irisgaming"]}
 
+PLAYOFF_SUBS = {"SNOW WHITE#ryuu": "ravanaesports", "ryuu#fwahh": "thekaalabillas", "Valorant hater#IGL": "nextera",
+                "PaiN#eeee": "irisgaming", "TheDKSam#1147": "meowdiff", "Klyx#onyt": "raaje"}
+
+# (loser, winner), normalised team names: Raaje to Tooth Monsters in group B (27 Nov), Buns Squad to Meow Diff in the
+# playoff qualifier (28 Nov). A cross-group forfeit is a playoff map, so it stays out of the group standings.
+FORFEITS = [("raaje", "toothmonsters"), ("bunssquad", "meowdiff")]
+
 
 async def init_db() -> None:
     async with engine.begin() as c:
@@ -51,7 +58,7 @@ async def init_db() -> None:
         await c.run_sync(Base.metadata.create_all)
         # create_all never alters existing tables, so columns added after the first deploy go here.
         for col in ("auth_provider varchar(8)", "auth_sub varchar(64)", "auth_email varchar(254)", "follows varchar(16)",
-                    "puuid varchar(80)", "card_url varchar(200)", "card_wide_url varchar(200)"):
+                    "puuid varchar(80)", "card_url varchar(200)", "card_wide_url varchar(200)", "sub_team_id integer"):
             await c.execute(text(f"ALTER TABLE player ADD COLUMN IF NOT EXISTS {col}"))
         await c.execute(text("CREATE INDEX IF NOT EXISTS ix_player_puuid ON player (puuid)"))
         await c.execute(text("ALTER TABLE team ADD COLUMN IF NOT EXISTS grp varchar(1)"))
@@ -62,14 +69,20 @@ async def init_db() -> None:
         for grp, names in GROUPS.items():
             await c.execute(text("UPDATE team SET grp = :g WHERE grp IS NULL AND "
                                  "regexp_replace(lower(name), '[^a-z0-9]', '', 'g') = ANY(:n)"), {"g": grp, "n": names})
-        # ponytail: one-off forfeit (27 Nov): Raaje forfeited to Tooth Monsters in group B, scored 13-0 with no player
-        # stats. Deleting it in Admin brings it back on restart; drop this block after the playoffs.
-        await c.execute(text(
-            "INSERT INTO game_match (tournament_id, henrik_match_id, map, team_a_id, team_b_id, rounds_a, rounds_b, status) "
-            "SELECT 1, 'forfeit:raaje-toothmonsters', 'Forfeit', a.id, b.id, 0, 13, 'published' FROM team a, team b "
-            "WHERE regexp_replace(lower(a.name), '[^a-z0-9]', '', 'g') = 'raaje' "
-            "AND regexp_replace(lower(b.name), '[^a-z0-9]', '', 'g') = 'toothmonsters' "
-            "ON CONFLICT (henrik_match_id) DO NOTHING"))
+        # ponytail: one-off seed of the playoff subs announced 28 Nov (Riot ID -> team); a sub already set is left alone.
+        for riot, team in PLAYOFF_SUBS.items():
+            await c.execute(text("UPDATE player SET sub_team_id = t.id FROM team t WHERE player.sub_team_id IS NULL "
+                                 "AND player.riot_id = :r AND regexp_replace(lower(t.name), '[^a-z0-9]', '', 'g') = :n"),
+                            {"r": riot, "n": team})
+        # ponytail: one-off forfeits, scored 13-0 to the winner with no player stats. Deleting one in Admin brings it
+        # back on restart; drop this block after the playoffs.
+        for loser, winner in FORFEITS:
+            await c.execute(text(
+                "INSERT INTO game_match (tournament_id, henrik_match_id, map, team_a_id, team_b_id, rounds_a, rounds_b, status) "
+                "SELECT 1, :k, 'Forfeit', a.id, b.id, 0, 13, 'published' FROM team a, team b "
+                "WHERE regexp_replace(lower(a.name), '[^a-z0-9]', '', 'g') = :l "
+                "AND regexp_replace(lower(b.name), '[^a-z0-9]', '', 'g') = :w "
+                "ON CONFLICT (henrik_match_id) DO NOTHING"), {"k": f"forfeit:{loser}-{winner}", "l": loser, "w": winner})
         await c.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_player_auth ON player (tournament_id, auth_provider, auth_sub) "
                              "WHERE auth_sub IS NOT NULL AND status NOT IN ('rejected', 'withdrawn')"))
     async with Session() as db:

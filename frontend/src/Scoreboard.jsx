@@ -45,7 +45,7 @@ export function MatchSummary({ m }) {
   const aWon = m.rounds_a > m.rounds_b
   return (
     <span className="sb-match">
-      <span className="mono muted">{m.map || 'Map'} · {when(m.started_at)}</span>
+      <span className="mono muted">{m.stage === 'playoffs' ? 'Playoffs · ' : ''}{m.map || 'Map'} · {when(m.started_at)}</span>
       <span className={'sb-side' + (aWon ? ' won' : '')}><Logo team={m.team_a} />{m.team_a.name}</span>
       <span className="digits sb-score">{m.rounds_a} – {m.rounds_b}</span>
       <span className={'sb-side' + (!aWon ? ' won' : '')}><Logo team={m.team_b} />{m.team_b.name}</span>
@@ -55,7 +55,18 @@ export function MatchSummary({ m }) {
 
 const STATS = [['rating', 'Rating', 'ACS adjusted for maps played: fewer maps pull it down'], ['acs', 'ACS', 'Average combat score per round'], ['kd', 'K/D', 'Kills per death'], ['adr', 'ADR', 'Average damage per round'],
   ['kills', 'K', 'Kills'], ['deaths', 'D', 'Deaths'], ['assists', 'A', 'Assists'], ['hs', 'HS%', 'Headshot percentage'], ['first_kills', 'FK', 'First kills']]
-const ROLES = ['All', 'Duelist', 'Initiator', 'Controller', 'Sentinel', 'Flex']
+const ROLES = ['All', 'Duelist', 'Initiator', 'Controller', 'Sentinel']
+// Agent portraits (from NTG, plus Hush) in /public/agents; an agent without one shows its initials.
+const PORTRAITS = new Set(['astra', 'breach', 'brimstone', 'chamber', 'clove', 'cypher', 'deadlock', 'fade', 'gekko', 'harbor', 'iso',
+  'jett', 'kayo', 'killjoy', 'miks', 'neon', 'omen', 'phoenix', 'raze', 'reyna', 'sage', 'skye', 'sova', 'tejo', 'veto', 'viper',
+  'vyse', 'waylay', 'yoru', 'hush'])
+export function Agent({ name, title, className = '' }) {
+  const key = (name || '').toLowerCase().replace(/[^a-z]/g, '')
+  return PORTRAITS.has(key)
+    ? <img className={'agent ' + className} src={`/agents/${key}.webp`} alt={name} title={title || name} loading="lazy" width="128" height="128" />
+    : <span className={'agent agent-ph ' + className} title={title || name} role="img" aria-label={name}>{(name || '?').slice(0, 2)}</span>
+}
+const Agents = ({ agents }) => <span className="agents">{(agents || []).map(([a, n]) => <Agent key={a} name={a} title={`${a} · ${n} ${n === 1 ? 'map' : 'maps'}`} />)}</span>
 
 // Rating = (combat score + K × B) ÷ (rounds + K): K rounds of below-average play (B) added to every record.
 function RatingMaths({ r }) {
@@ -73,11 +84,12 @@ function RatingMaths({ r }) {
   </>
 }
 
-function Leaderboard({ players }) {
+// All: one row per player (main role = the role of most maps). A role: only maps on that role's agents.
+function Leaderboard({ players, byRole }) {
   const [role, setRole] = useState('All')
   const [sort, setSort] = useState('rating')
   const dir = sort === 'deaths' ? 1 : -1      // fewest deaths first
-  const rows = players.filter(p => role === 'All' || p.role === role)
+  const rows = (role === 'All' ? players : byRole.filter(p => p.role === role))
     .sort((x, y) => dir * (x[sort] - y[sort]) || y.rating - x.rating)
   return (
     <>
@@ -92,9 +104,9 @@ function Leaderboard({ players }) {
               <button type="button" className={sort === k ? 'on' : ''} onClick={() => setSort(k)}>{c}</button></th>)}
           </tr></thead>
           <tbody>{rows.map((p, i) => (
-            <tr key={p.id}>
+            <tr key={p.id + p.role}>
               <td className="digits">{i + 1}</td>
-              <td><span className="sb-side"><Logo team={p.team} /><span><strong>{p.display_name}</strong><br /><span className="muted small">{p.team?.tag ? `${p.team.tag} · ` : ''}{p.role}</span></span></span></td>
+              <td><strong>{p.display_name}</strong><span className="sb-roleline"><span className="muted small">{p.role}</span><Agents agents={p.agents} /></span></td>
               <td>{p.games}</td><td><strong className={sort === 'rating' ? 'amber' : ''}>{p.rating}</strong></td><td>{p.acs}</td><td>{p.kd.toFixed(2)}</td><td>{p.adr}</td>
               <td>{p.kills}</td><td>{p.deaths}</td><td>{p.assists}</td><td>{p.hs}%</td><td>{p.first_kills}</td>
             </tr>
@@ -118,7 +130,7 @@ export default function Scoreboard() {
     <>
       <Nav info={info} />
       <main className="wrap scoreboard">
-        <p className="mono amber">GROUP STAGE</p>
+        <p className="mono amber">GROUP STAGE · PLAYOFFS</p>
         <h1 className="display">Scoreboard</h1>
         {err && <p className="err" role="alert">{err}</p>}
         {!data && !err && <p className="muted">Loading…</p>}
@@ -173,7 +185,7 @@ export default function Scoreboard() {
                 <li><b>HS%</b>: share of hits that were headshots</li>
                 <li><b>FK</b>: rounds where they got the first kill</li>
               </ul>
-              <p>Everyone who has played a map is ranked. Roles are the ones players signed up with.</p>
+              <p>Everyone who has played a map is ranked. Roles come from the agents played: pick a role to see only the maps each player played on that role's agents. Under All, a player's role is the one they played most, and the agents listed are the ones they played most.</p>
               {data.rating && <RatingMaths r={data.rating} />}
             </Head>
             {data.players.length ? <>
@@ -183,9 +195,12 @@ export default function Scoreboard() {
                     ? <img className="sb-card" src={l.card_url} alt="" loading="lazy" width="268" height="640" />
                     : <div className="sb-card sb-card-ph" aria-hidden="true">{l.team?.logo_url && <img src={l.team.logo_url} alt="" />}</div>}
                   <p className="sb-role">Top {l.role}</p>
+                  {l.best_agent && <Agent name={l.best_agent.agent} className="sb-best"
+                    title={`Best agent: ${l.best_agent.agent} · ${l.best_agent.acs} ACS over ${l.best_agent.games} ${l.best_agent.games === 1 ? 'map' : 'maps'}`} />}
                   <div className="sb-leader-name">
                     <h3 className="display">{l.display_name}</h3>
-                    {l.team && <p className="sb-team"><Logo team={l.team} />{l.team.name}</p>}
+                    <p className="sb-team">{l.best_agent && <span className="amber">{l.best_agent.agent}</span>}
+                      {l.best_agent && l.team && <span className="muted"> · </span>}{l.team?.name}</p>
                   </div>
                   <dl className="sb-leader-stats">
                     <div className="main"><dt>Rating</dt><dd>{l.rating}</dd></div>
@@ -194,8 +209,8 @@ export default function Scoreboard() {
                   </dl>
                 </article>
               ))}</div>
-              <Leaderboard players={data.players} />
-              <p className="sb-key mono muted">Auction players only, on maps for their own team. Stand-in games don't count.</p>
+              <Leaderboard players={data.players} byRole={data.players_by_role} />
+              <p className="sb-key mono muted">Auction players and playoff subs, on maps for their own teams. Other stand-ins don't count.</p>
             </> : <p className="muted">The leaderboard fills in once matches are published.</p>}
           </section>
 

@@ -17,7 +17,13 @@ from ...models import GameMatch, GameMatchPlayer, Player, PlayerAlias, Team
 from ..auction.service import active_sales, auction_teams
 from . import henrik
 
-ROLES = ["Duelist", "Initiator", "Controller", "Sentinel", "Flex"]
+ROLES = ["Duelist", "Initiator", "Controller", "Sentinel"]
+# Role awards and the leaderboard go by the agent actually played. A new agent missing here falls back to the
+# role the player signed up with, so add it when Riot releases one.
+AGENT_ROLE = {**dict.fromkeys(["Jett", "Phoenix", "Reyna", "Raze", "Yoru", "Neon", "Iso", "Waylay", "Hush"], "Duelist"),
+              **dict.fromkeys(["Sova", "Breach", "Skye", "KAY/O", "Fade", "Gekko", "Tejo"], "Initiator"),
+              **dict.fromkeys(["Brimstone", "Viper", "Omen", "Astra", "Harbor", "Clove", "Miks"], "Controller"),
+              **dict.fromkeys(["Killjoy", "Cypher", "Sage", "Chamber", "Deadlock", "Vyse", "Veto"], "Sentinel")}
 WIN, CLOSE_LOSS, LOSS = 3, 1, 0
 CLOSE_MARGIN = 3        # losing by this many rounds or fewer still earns CLOSE_LOSS
 
@@ -169,18 +175,36 @@ def baseline(stats: list[dict]) -> float:
     return BASELINE_SHARE * sum(s["score"] for s in stats) / rounds if rounds else 0
 
 
-def rank_players(stats: list[dict]) -> list[dict]:
+def rank_players(stats: list[dict], base: float | None = None) -> list[dict]:
     """Everyone is ranked by rating: ACS blended with a below-average baseline, so few maps pull a player down
-    and the pull fades as they play more. K/D breaks ties."""
-    base = baseline(stats)
+    and the pull fades as they play more. K/D breaks ties. base: the league's, when stats is only part of it."""
+    base = baseline(stats) if base is None else base
     rated = [{**s, "rating": round((s["score"] + base * BASELINE_ROUNDS) / (s["rounds"] + BASELINE_ROUNDS))} for s in stats]
     return sorted(rated, key=lambda s: (-s["rating"], -s["kd"]))
 
 
-def role_leaders(stats: list[dict]) -> list[dict]:
-    """stats rows carry 'role' (the role they signed up with). The top rated player in each role."""
-    ranked = rank_players(stats)
-    return [{"role": role, **best} for role in ROLES if (best := next((s for s in ranked if s.get("role") == role), None))]
+def role_leaders(by_role: list[dict], base: float) -> list[dict]:
+    """by_role: one row per (player, role played), from only the maps on that role's agents. Top rated in each."""
+    ranked = rank_players(by_role, base)
+    return [best for role in ROLES if (best := next((s for s in ranked if s["role"] == role), None))]
+
+
+def top_agents(agents: Counter, n: int = 3) -> list[list]:
+    return [[a, c] for a, c in agents.most_common(n)]
+
+
+def group_maps(matches: list[dict], group: dict[int, str | None]) -> list[dict]:
+    """The group stage maps: the first published map between two teams of the same group (group stage was BO1);
+    two teams with no group yet count as the same group.
+    Everything else (a second map between them, cross-group maps) is playoffs and stays out of the standings.
+    matches: {id, team_a_id, team_b_id, started_at}; a forfeit has no start time and counts as earliest."""
+    seen, out = set(), []
+    for m in sorted(matches, key=lambda m: (m["started_at"] is not None, m["started_at"] or 0, m["id"])):
+        pair = frozenset((m["team_a_id"], m["team_b_id"]))
+        if group.get(m["team_a_id"]) == group.get(m["team_b_id"]) and pair not in seen:
+            seen.add(pair)
+            out.append(m)
+    return out
 
 
 # ---------- database side
@@ -190,12 +214,15 @@ def team_card(t: Team) -> dict:
 
 
 async def lineups(db: AsyncSession) -> dict[int, dict]:
-    """Every approved team with its default lineup: captain + players bought in the auction."""
+    """Every approved team with its default lineup: captain + players bought in the auction + playoff subs
+    (who also stay on the team that bought them)."""
     sales = await active_sales(db)
+    subs = list(await db.scalars(select(Player).where(Player.sub_team_id.is_not(None), Player.status == "approved")))
     out = {}
     for team, leader in await auction_teams(db):
         roster = [p for sale, p in sales if sale.team_id == team.id]
-        out[team.id] = {"team": team, "players": [leader, *roster]}
+        mine = [p for p in subs if p.sub_team_id == team.id]
+        out[team.id] = {"team": team, "players": [leader, *roster, *mine], "subs": mine}
     return out
 
 
@@ -337,6 +364,10 @@ async def board(db: AsyncSession, published_only: bool = True) -> dict:
                 "player_id": r.player_id, "team_id": r.team_id}
 
     published = [m for m in matches if m.status == "published"]
+    grp = {t.id: t.grp for t in teams.values()}
+    slim = lambda ms: [{"id": m.id, "team_a_id": m.team_a_id, "team_b_id": m.team_b_id, "started_at": m.started_at} for m in ms]  # noqa: E731
+    group_ids = {m["id"] for m in group_maps(slim(published), grp)}
+    labelled = group_ids | {m["id"] for m in group_maps(slim(matches), grp)}   # admin preview: candidates too
     out_matches = []
     for m in matches:
         rounds = m.rounds_a + m.rounds_b
@@ -354,31 +385,54 @@ async def board(db: AsyncSession, published_only: bool = True) -> dict:
                             "started_at": m.started_at.isoformat() if m.started_at else None,
                             "team_a": team_card(teams[m.team_a_id]), "team_b": team_card(teams[m.team_b_id]),
                             "rounds_a": m.rounds_a, "rounds_b": m.rounds_b,
+                            "stage": "group" if m.id in labelled else "playoffs",
                             "mvp": mvp and mvp["display_name"], "players": players})
 
     pub_ids = {m.id: m.rounds_a + m.rounds_b for m in published}
-    # Player stats are for the auction tournament only: captains and bought players, on maps for their own team.
-    # Stand-in games for another team, and subs who aren't on a roster, never reach the leaderboard.
-    home = {p.id: tid for tid, v in (await lineups(db)).items() for p in v["players"]}
-    stat_rows = [{"key": r.player_id, "rounds": pub_ids[r.match_id], **{k: getattr(r, k) for k in (
+    # Player stats are for the auction tournament only: captains, bought players and playoff subs, on maps for a
+    # team they're on (a playoff sub counts for both teams). Other stand-ins never reach the leaderboard.
+    plays: dict[int, set] = {}
+    own: dict[int, int] = {}
+    for tid, v in (await lineups(db)).items():
+        for p in v["players"]:
+            plays.setdefault(p.id, set()).add(tid)
+            if p not in v["subs"]:
+                own[p.id] = tid
+    stat_rows = [{"key": r.player_id, "rounds": pub_ids[r.match_id],
+                  "role": AGENT_ROLE.get(r.agent) or people[r.player_id].role, **{k: getattr(r, k) for k in (
         "agent", "kills", "deaths", "assists", "score", "damage", "headshots", "bodyshots", "legshots",
         "first_kills", "first_deaths")}} for r in rows
-        if r.match_id in pub_ids and r.player_id and home.get(r.player_id) == r.team_id]
+        if r.match_id in pub_ids and r.player_id and r.team_id in plays.get(r.player_id, ())]
     stats = list(aggregate(stat_rows).values())
-    for s in stats:
-        p = people[s["key"]]
-        s.update(role=p.role, display_name=p.display_name, riot_id=p.riot_id, card_url=p.card_url,
-                 card_wide_url=p.card_wide_url, agents=dict(s["agents"]), team=team_card(teams[home[s["key"]]]))
-    public = ("display_name", "riot_id", "role", "team", "games", "rating", "acs", "kd", "adr", "hs", "kills", "deaths", "assists",
-              "first_kills", "first_deaths")
-    leaders = [{k: l[k] for k in ("role", "display_name", "riot_id", "card_url", "team", "games", "rating", "acs", "kd")}
-               for l in role_leaders(stats)]
-    players = [{"id": p["key"], **{k: p[k] for k in public}} for p in rank_players(stats)]
+    # The same maps split by the role of the agent played: "best Duelist" counts only their Duelist maps.
+    by_role = list(aggregate([{**r, "key": (r["key"], r["role"])} for r in stat_rows]).values())
+    main_role = {}
+    for s in sorted(by_role, key=lambda s: s["games"]):
+        main_role[s["key"][0]] = s["key"][1]     # most maps wins (ties: the later, arbitrary)
+    for s in stats + by_role:
+        pid = s["key"][0] if isinstance(s["key"], tuple) else s["key"]
+        p = people[pid]
+        s.update(id=pid, role=s["key"][1] if isinstance(s["key"], tuple) else main_role[pid], display_name=p.display_name,
+                 riot_id=p.riot_id, card_url=p.card_url, agents=top_agents(s["agents"]),
+                 team=team_card(teams[own.get(pid) or min(plays[pid])]))
+    public = ("id", "display_name", "riot_id", "role", "agents", "team", "games", "rating", "acs", "kd", "adr", "hs",
+              "kills", "deaths", "assists", "first_kills", "first_deaths")
+    base = baseline(stats)
+    # Each role's best agent per player: rated like the leaderboard, so one lucky map on an agent doesn't win it.
+    by_agent = rank_players(list(aggregate([{**r, "key": (r["key"], r["role"], r["agent"])}
+                                            for r in stat_rows if r["agent"]]).values()), base)
+    for s in by_role:
+        best = next((a for a in by_agent if a["key"][:2] == s["key"]), None)
+        s["best_agent"] = best and {"agent": best["key"][2], "acs": best["acs"], "games": best["games"]}
+    leaders = [{k: l[k] for k in ("role", "agents", "best_agent", "display_name", "riot_id", "card_url", "team", "games", "rating", "acs", "kd")}
+               for l in role_leaders(by_role, base)]
+    players = [{k: p[k] for k in public} for p in rank_players(stats, base)]
+    players_by_role = [{k: p[k] for k in public} for p in rank_players(by_role, base)]
     cards = [team_card(t) for t in approved.values()]
     games = [{"team_a_id": m.team_a_id, "team_b_id": m.team_b_id, "rounds_a": m.rounds_a, "rounds_b": m.rounds_b}
-             for m in published]
+             for m in published if m.id in group_ids]
     # ranked within each group (A, B; teams without a group last)
     table = [row for g in sorted({c["group"] or "~" for c in cards})
              for row in standings([c for c in cards if (c["group"] or "~") == g], games)]
-    return {"role_leaders": leaders, "players": players,
-            "rating": {"baseline": round(baseline(stats)), "rounds": BASELINE_ROUNDS, "share": BASELINE_SHARE}, "standings": table, "matches": out_matches}
+    return {"role_leaders": leaders, "players": players, "players_by_role": players_by_role,
+            "rating": {"baseline": round(base), "rounds": BASELINE_ROUNDS, "share": BASELINE_SHARE}, "standings": table, "matches": out_matches}

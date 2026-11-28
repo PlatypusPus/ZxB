@@ -628,7 +628,7 @@ const VETO_STATUS = { coin: 'Waiting for the coin toss', ban: 'Banning maps', si
 function VetoAdmin({ call }) {
   const [data, setData] = useState(null)
   const [flash, setFlash] = useState('')
-  const [form, setForm] = useState({ a: '', b: '', pool: null })
+  const [form, setForm] = useState({ a: '', b: '', pool: null, bo: 1 })
   const [sure, setSure] = useState(null)
   const [stand, setStand] = useState({})   // veto id -> picked player id for a stand-in link
   const load = () => call('/admin/vetoes').then(setData).catch(e => setFlash(e.message))
@@ -642,15 +642,15 @@ function VetoAdmin({ call }) {
   const url = path => location.origin + path
   const copy = (text, done) => navigator.clipboard?.writeText(text).then(() => setFlash(done), () => setFlash(text))
   // Ready to paste into WhatsApp or Discord: each captain finds their own team's link.
-  const both = v => `Map veto: ${v.team_a?.name} vs ${v.team_b?.name}\n\n${v.team_a?.name} captain:\n${url(v.links[v.team_a?.id])}\n\n${v.team_b?.name} captain:\n${url(v.links[v.team_b?.id])}\n\nOpen only your team's link. No sign-in needed.`
+  const both = v => `Map veto (BO${v.bo}):${v.team_a?.name} vs ${v.team_b?.name}\n\n${v.team_a?.name} captain:\n${url(v.links[v.team_a?.id])}\n\n${v.team_b?.name} captain:\n${url(v.links[v.team_b?.id])}\n\nOpen only your team's link. No sign-in needed.`
   const post = async (path, body, ok) => {
     setFlash('')
     try { const r = await call(path, { method: 'POST', body }); setFlash(ok(r)); setSure(null); load() } catch (e) { setFlash(e.message) }
   }
   const create = e => {
     e.preventDefault()
-    post('/admin/vetoes', { team_a: +form.a, team_b: +form.b, pool }, r => {
-      setForm({ a: '', b: '', pool })
+    post('/admin/vetoes', { team_a: +form.a, team_b: +form.b, pool, bo: form.bo }, r => {
+      setForm({ a: '', b: '', pool, bo: form.bo })
       copy(both(r), 'Veto ready. Both captain links are copied, paste them to the captains.')
       return 'Veto ready. Use Copy both links below to send it to the captains.'
     })
@@ -660,7 +660,7 @@ function VetoAdmin({ call }) {
     <section>
       <form className="card" onSubmit={create}>
         <h3>New map veto</h3>
-        <p className="muted">Team A's captain calls the coin toss. The winner bans first, then the captains take turns banning until one map is left. The team that didn't make the last ban picks its starting side. You get one link per captain to send them, no sign-in needed.</p>
+        <p className="muted">Team A's captain calls the coin toss. The winner moves first, then the captains take turns. BO1: bans until one map is left. BO3: two bans, two picks (the other team picks the side on each), then bans until the decider is left. The team that didn't make the last move picks the decider's side. You get one link per captain to send them, no sign-in needed.</p>
         <div className="sb-picks">
           {[['a', 'Team A (calls the toss)'], ['b', 'Team B']].map(([k, label]) => (
             <label key={k} className="sb-pick">{label}<select value={form[k]} required onChange={e => setForm({ ...form, [k]: e.target.value })}>
@@ -668,6 +668,9 @@ function VetoAdmin({ call }) {
               {data.teams.map(t => <option key={t.id} value={t.id} disabled={String(t.id) === form[k === 'a' ? 'b' : 'a']}>{t.group ? `[${t.group}] ` : ''}{t.name}</option>)}
             </select></label>
           ))}
+          <label className="sb-pick">Format<select value={form.bo} onChange={e => setForm({ ...form, bo: +e.target.value })}>
+            <option value={1}>Best of 1</option><option value={3}>Best of 3</option>
+          </select></label>
         </div>
         <p className="vt-pool-h"><strong>Map pool</strong> <span className="muted small">{pool.length} selected · tap a map to add or remove it</span></p>
         <ul className="vt-maps">{data.maps.map((m, i) => {
@@ -675,7 +678,7 @@ function VetoAdmin({ call }) {
           return <li key={m}><MapCard map={m} i={i} state={on ? 'in' : 'off'} tag={on ? 'IN POOL' : ''} pressed={on}
             onClick={() => setForm(f => { const cur = f.pool ?? data.last_pool; return { ...f, pool: cur.includes(m) ? cur.filter(x => x !== m) : data.maps.filter(x => x === m || cur.includes(x)) } })} /></li>
         })}</ul>
-        <div className="actions"><button className="btn" disabled={!form.a || !form.b || pool.length < 2}>Start veto</button></div>
+        <div className="actions"><button className="btn" disabled={!form.a || !form.b || pool.length < form.bo + 1}>Start BO{form.bo} veto</button></div>
       </form>
       {flash && <p className="flash" role="status">{flash}</p>}
 
@@ -683,8 +686,8 @@ function VetoAdmin({ call }) {
       {!data.vetoes.length && <p className="muted">No vetoes yet.</p>}
       <ul className="vt-list">{data.vetoes.map(v => (
         <li key={v.id}>
-          <span><strong>{v.team_a?.name} vs {v.team_b?.name}</strong><br />
-            <span className="muted small">{VETO_STATUS[v.status]}{v.map ? ` · ${v.map}` : ''}{v.side ? ` · ${data.teams.find(t => t.id === v.side_team_id)?.tag} on ${v.side}` : ''}{[v.team_a, v.team_b].filter(t => t?.delegate).map(t => ` · ${t.delegate} vetoes for ${t.tag}`).join('')}</span></span>
+          <span><strong>{v.team_a?.name} vs {v.team_b?.name}</strong> <span className="mono muted small">BO{v.bo}</span><br />
+            <span className="muted small">{VETO_STATUS[v.status]}{v.maps.map(m => ` · ${m.map}${m.side ? ` (${team(m.side_team_id)?.tag} ${m.side})` : ''}`).join('')}{[v.team_a, v.team_b].filter(t => t?.delegate).map(t => ` · ${t.delegate} vetoes for ${t.tag}`).join('')}</span></span>
           <span className="tp-acts">
             <a className="btn ghost" href={`/veto/${v.id}`} target="_blank" rel="noreferrer">Watch</a>
             {v.status !== 'done' && <>
@@ -786,14 +789,15 @@ function ScoreboardAdmin({ call }) {
       {!data.configured && <p className="err" role="alert">The Henrik API key isn't set on the server (HENRIKDEV_API_KEY), so searches will fail.</p>}
       <p>Pick the two teams that played. If someone was subbed, remove them and add the stand-in. The search reads the players' recent custom games and only shows matches that players from both teams were in.</p>
       {vetoes.length > 0 && <label className="sb-from">Start from a finished veto <select value="" onChange={e => {
-        const v = vetoes.find(x => x.id === +e.target.value)
+        const [vid, map] = e.target.value.split(':')
+        const v = vetoes.find(x => x.id === +vid)
         if (!v) return
         const ids = s => team(s)?.players.map(p => p.id) || []
-        setPick({ a: String(v.team_a.id), b: String(v.team_b.id), map: v.map }); setFound(null)
+        setPick({ a: String(v.team_a.id), b: String(v.team_b.id), map }); setFound(null)
         setLineup({ a: ids(v.team_a.id), b: ids(v.team_b.id) })
       }}>
         <option value="">Choose a veto</option>
-        {vetoes.map(v => <option key={v.id} value={v.id}>{v.team_a?.name} vs {v.team_b?.name} · {v.map}</option>)}
+        {vetoes.flatMap(v => v.maps.map(m => <option key={v.id + m.map} value={`${v.id}:${m.map}`}>{v.team_a?.name} vs {v.team_b?.name} · {m.map}</option>))}
       </select></label>}
       <div className="sb-picks">{side('a')}{side('b')}</div>
       <div className="toolbar">

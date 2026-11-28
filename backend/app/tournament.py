@@ -62,7 +62,8 @@ async def init_db() -> None:
             await c.execute(text(f"ALTER TABLE player ADD COLUMN IF NOT EXISTS {col}"))
         await c.execute(text("CREATE INDEX IF NOT EXISTS ix_player_puuid ON player (puuid)"))
         await c.execute(text("ALTER TABLE team ADD COLUMN IF NOT EXISTS grp varchar(1)"))
-        for col in ("a_key_hash varchar(64)", "b_key_hash varchar(64)", "a_delegate varchar(32)", "b_delegate varchar(32)"):
+        for col in ("a_key_hash varchar(64)", "b_key_hash varchar(64)", "a_delegate varchar(32)", "b_delegate varchar(32)",
+                    "bo integer NOT NULL DEFAULT 1"):
             await c.execute(text(f"ALTER TABLE veto ADD COLUMN IF NOT EXISTS {col}"))
         # ponytail: one-off seed of the announced group allocation (19 Nov); teams already given a group are left alone,
         # names that don't match stay blank and are set in Admin -> Teams -> Manage team.

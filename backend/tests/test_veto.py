@@ -118,3 +118,35 @@ async def test_veto_link_for_a_stand_in(c):
     assert (await c.get(f"/api/v1/vetoes/{vid}?k={key}")).json()["you"] is None
     assert (await c.get(f"/api/v1/vetoes/{vid}?k={new}")).json()["you"] == 2
     assert (await c.post(f"/api/v1/admin/vetoes/{vid}/link", json={"team_id": 2, "player_id": 2})).status_code == 401
+
+
+async def test_bo3_bans_picks_sides_then_decider(c):
+    await seed(n_teams=2, n_players=0)
+    pool = ["Ascent", "Bind", "Haven", "Lotus", "Pearl", "Split", "Sunset"]
+    admin = lambda **kw: c.post("/api/v1/admin/vetoes", headers=c.admin, json={"team_a": 1, "team_b": 2, **kw})  # noqa: E731
+    assert (await admin(pool=pool[:2], bo=3)).status_code == 422
+    r = (await admin(pool=pool, bo=3)).json()
+    assert r["bo"] == 3 and [s["kind"] for s in r["steps"]] == ["ban", "ban", "pick", "pick", "ban", "ban"]
+    vid = r["id"]
+    k = {int(t): u.split("?k=")[1] for t, u in r["links"].items()}
+    move = lambda team, action, value: c.post(f"/api/v1/vetoes/{vid}/{action}?k={k[team]}", json={"value": value})  # noqa: E731
+    f = (await move(1, "call", "heads")).json()["first_team_id"]
+    s_ = 3 - f
+    await move(f, "ban", "Ascent")
+    await move(s_, "ban", "Bind")
+    assert (await move(f, "ban", "Haven")).status_code == 409           # this step is a pick
+    s = (await move(f, "pick", "Haven")).json()
+    assert (s["status"], s["turn"]) == ("side", s_)
+    s = (await move(s_, "side", "attack")).json()
+    assert (s["status"], s["turn"], s["step"]) == ("ban", s_, "pick")
+    await move(s_, "pick", "Lotus")
+    await move(f, "side", "defense")
+    await move(f, "ban", "Pearl")
+    s = (await move(s_, "ban", "Split")).json()
+    assert (s["status"], s["map"], s["side_team_id"]) == ("side", "Sunset", f)
+    s = (await move(f, "side", "attack")).json()
+    assert s["status"] == "done" and s["maps"] == [
+        {"map": "Haven", "picked_by": f, "side_team_id": s_, "side": "attack"},
+        {"map": "Lotus", "picked_by": s_, "side_team_id": f, "side": "defense"},
+        {"map": "Sunset", "picked_by": None, "side_team_id": f, "side": "attack"}]
+    assert [x["team_id"] for x in s["steps"]] == [f, s_, f, s_, f, s_]

@@ -70,18 +70,22 @@ export default function Veto({ id }) {
   const winner = team(v.first_team_id)
   const banBy = Object.fromEntries(v.bans.map((b, i) => [b.map, { ...b, n: i + 1 }]))
   const opposite = { attack: 'defense', defense: 'attack' }
+  const otherTeam = tid => tid === v.team_a?.id ? v.team_b : v.team_a
+  const sideMap = v.map || v.bans[v.bans.length - 1]?.map   // the map whose side is being picked
+  const verb = v.step === 'pick' ? 'pick' : 'ban'
+  const order = { ban: 'BAN', pick: 'PICK' }
 
   const headline = !revealed ? 'Flipping…'
     : v.status === 'coin' ? (mine ? 'Call the coin toss' : `${v.team_a?.captain} (${v.team_a?.tag}) calls the toss`)
-    : v.status === 'ban' ? (mine ? 'Your ban' : `${team(v.turn)?.name} is banning`)
-    : v.status === 'side' ? (mine ? `Pick your starting side on ${v.map}` : `${team(v.turn)?.name} is picking a side`)
-    : `${v.map}`
+    : v.status === 'ban' ? (mine ? `Your ${verb}` : `${team(v.turn)?.name} is ${verb === 'pick' ? 'picking a map' : 'banning'}`)
+    : v.status === 'side' ? (mine ? `Pick your starting side on ${sideMap}` : `${team(v.turn)?.name} is picking a side on ${sideMap}`)
+    : v.maps.map(m => m.map).join(' · ')
 
   return (
     <>
       <Nav info={info} />
       <main className="wrap veto">
-        <p className="mono amber">MAP VETO · BO1</p>
+        <p className="mono amber">MAP VETO · BO{v.bo}</p>
         <header className="vt-teams">
           {[v.team_a, v.team_b].map(t => (
             <div key={t?.id} className={'vt-team' + (v.turn === t?.id && revealed ? ' on' : '')}>
@@ -115,23 +119,44 @@ export default function Veto({ id }) {
                 return (
                   <li key={m}>
                     <MapCard map={m} i={i} pressed={pick === m} disabled={!live || busy} onClick={() => setPick(m)}
-                      state={ban ? 'gone' : m === v.map ? 'picked' : pick === m ? 'sel' : ''}
-                      tag={ban ? `BAN ${ban.n} · ${team(ban.team_id)?.tag}` : m === v.map ? 'PLAYING' : pick === m ? 'BAN?' : ''} />
+                      state={ban?.kind === 'pick' || m === v.map ? 'picked' : ban ? 'gone' : pick === m ? 'sel' : ''}
+                      tag={ban ? `${order[ban.kind || 'ban']} ${ban.n} · ${team(ban.team_id)?.tag}` : m === v.map ? (v.bo === 3 ? 'DECIDER' : 'PLAYING') : pick === m ? `${order[verb]}?` : ''} />
                   </li>
                 )
               })}
             </ul>
             {v.status === 'ban' && mine && <div className="actions vt-confirm">
-              <button className="btn" disabled={!pick || busy} onClick={() => send('ban', pick)}>{pick ? `Ban ${pick}` : 'Choose a map to ban'}</button>
-              <span className="muted small">{v.remaining.length - 1} {v.remaining.length === 2 ? 'ban' : 'bans'} left. The last map standing is played.</span>
+              <button className="btn" disabled={!pick || busy} onClick={() => send(verb, pick)}>{pick ? `${verb === 'pick' ? 'Pick' : 'Ban'} ${pick}` : `Choose a map to ${verb}`}</button>
+              <span className="muted small">{verb === 'pick' ? `${otherTeam(v.you)?.name} picks the side on it.` : 'The last map standing is played.'}</span>
             </div>}
             {v.status === 'side' && mine && <div className="actions vt-confirm">
               <button className="btn" disabled={busy} onClick={() => send('side', 'attack')}>Attack</button>
               <button className="btn" disabled={busy} onClick={() => send('side', 'defense')}>Defense</button>
             </div>}
-            {v.status === 'done' && <p className="vt-result">
-              <strong>{v.map}</strong>. {team(v.side_team_id)?.name} starts on <strong className="amber">{v.side}</strong>, {team(v.side_team_id === v.team_a?.id ? v.team_b?.id : v.team_a?.id)?.name} on {opposite[v.side]}.
-            </p>}
+            {v.status === 'done' && <ol className="vt-result">{v.maps.map(m => (
+              <li key={m.map}><strong>{m.map}</strong>{v.bo === 3 && <span className="muted"> ({m.picked_by ? `${team(m.picked_by)?.tag} pick` : 'decider'})</span>}. {team(m.side_team_id)?.name} starts on <strong className="amber">{m.side}</strong>, {otherTeam(m.side_team_id)?.name} on {opposite[m.side]}.</li>
+            ))}</ol>}
+          </section>
+        )}
+
+        {v.status !== 'coin' && revealed && (
+          <section aria-label="Veto order">
+            <ol className="vt-steps">
+              {v.steps.map((s, i) => {
+                const b = v.bans[i], now = i === v.bans.length && v.status === 'ban'
+                return <li key={i} className={(b ? 'did ' : '') + (now ? 'now ' : '') + s.kind}>
+                  <span className="mono">{i + 1} · {order[s.kind]}</span>
+                  <strong>{team(s.team_id)?.tag}</strong>
+                  <span>{b ? b.map : now ? `${s.kind === 'pick' ? 'picking' : 'banning'}…` : ''}</span>
+                  {b?.kind === 'pick' && <span className="muted small">{b.side ? `${team(b.side_team_id)?.tag} ${b.side}` : `${otherTeam(b.team_id)?.tag} picks side…`}</span>}
+                </li>
+              })}
+              <li className={'decider' + (v.map ? ' did' : '')}>
+                <span className="mono">{v.bo === 3 ? 'DECIDER' : 'MAP'}</span>
+                <strong>{v.map || 'Last map left'}</strong>
+                {v.map && <span className="muted small">{v.side ? `${team(v.side_team_id)?.tag} ${v.side}` : `${team(v.side_team_id)?.tag} picks side…`}</span>}
+              </li>
+            </ol>
           </section>
         )}
 

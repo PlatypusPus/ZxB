@@ -834,3 +834,10 @@ fieldset.field { border: 0; padding: 0; margin: 0 0 calc(var(--t) * .75); min-wi
 .sb-unranked { opacity: .55; }
 .sb-players .digits { font-size: 20px; }
 .sb-standings + .sb-key { padding-bottom: 10px; }
+.vt-steps { list-style: none; padding: 0; margin: var(--t) 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: 8px; }
+.vt-steps li { display: grid; gap: 2px; padding: 10px 12px; background: var(--tile); border: 1px solid var(--line); }
+.vt-steps li.pick .mono, .vt-steps li.decider .mono { color: var(--amber); }
+.vt-steps li.now { border-color: var(--pink); }
+.vt-steps li:not(.did):not(.now) { opacity: .55; }
+.vt-steps .mono { font-size: 10px; color: var(--muted); }
+ol.vt-result { padding-left: 1.2em; }

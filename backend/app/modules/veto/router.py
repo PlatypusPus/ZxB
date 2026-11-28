@@ -1,6 +1,7 @@
-"""Map veto (BO1, Challonge style). The organiser pairs two teams and sends each captain their team's link (or they sign in);
-they call a coin toss, ban maps in turn until one is left, and the team that didn't make the last ban picks a side.
-Anyone with the link can watch."""
+"""Map veto (BO1 or BO3, Challonge style). The organiser pairs two teams and sends each captain their team's link (or they sign in);
+they call a coin toss and take turns: BO1 bans until one map is left; BO3 bans two, picks two (the other team picks the side
+on each pick), bans the rest, and the last map left is the decider. The team that didn't make the last move picks the
+decider's side. Anyone with the link can watch."""
 import hmac
 import secrets
 
@@ -30,12 +31,25 @@ def remaining(v: Veto) -> list[str]:
     return [m for m in v.pool if m not in gone]
 
 
+def plan(v: Veto) -> list[str]:
+    """Every ban/pick in order; the toss winner makes the 1st, 3rd, 5th... The map left after them is the decider."""
+    n = len(v.pool)
+    if v.bo == 3:
+        first = min(2, n - 3)
+        return ["ban"] * first + ["pick", "pick"] + ["ban"] * (n - 3 - first)
+    return ["ban"] * (n - 1)
+
+
+def step_team(v: Veto, i: int) -> int | None:
+    return v.first_team_id and (v.first_team_id if i % 2 == 0 else other(v, v.first_team_id))
+
+
 def turn(v: Veto) -> int | None:
     """Whose move it is."""
     if v.status == "coin":
         return v.team_a_id
     if v.status == "ban":
-        return v.first_team_id if len(v.bans) % 2 == 0 else other(v, v.first_team_id)
+        return step_team(v, len(v.bans))
     if v.status == "side":
         return v.side_team_id
     return None
@@ -53,19 +67,42 @@ def act(v: Veto, team_id: int, action: str, value: str) -> None:
         v.call, v.coin = value, secrets.choice(("heads", "tails"))
         v.first_team_id = v.team_a_id if v.call == v.coin else v.team_b_id
         v.status = "ban"
-    elif action == "ban" and v.status == "ban":
+    elif action in ("ban", "pick") and v.status == "ban":
+        if action != plan(v)[len(v.bans)]:
+            raise ValueError(f"This move is a {plan(v)[len(v.bans)]}")
         if value not in remaining(v):
             raise ValueError("That map isn't in the pool any more")
-        v.bans = [*v.bans, {"team_id": team_id, "map": value}]
-        left = remaining(v)
-        if len(left) == 1:   # the last ban decided the map; the other team picks the side
-            v.map, v.side_team_id, v.status = left[0], other(v, team_id), "side"
+        v.bans = [*v.bans, {"team_id": team_id, "map": value, "kind": action}]
+        if action == "pick":   # the other team picks the side on this map
+            v.side_team_id, v.status = other(v, team_id), "side"
+        else:
+            _next(v)
     elif action == "side" and v.status == "side":
         if value not in ("attack", "defense"):
             raise ValueError("Pick attack or defense")
-        v.side, v.status = value, "done"
+        if v.map:   # the decider: veto over
+            v.side, v.status = value, "done"
+        else:       # side on a picked map, then the veto goes on
+            v.bans = [*v.bans[:-1], {**v.bans[-1], "side_team_id": v.side_team_id, "side": value}]
+            v.side_team_id, v.status = None, "ban"
+            _next(v)
     else:
         raise ValueError("That move isn't open right now")
+
+
+def _next(v: Veto) -> None:
+    """After a move: once every ban/pick is made, the map left is the decider and the team that didn't move last picks its side."""
+    if len(v.bans) == len(plan(v)):
+        v.map, v.side_team_id, v.status = remaining(v)[0], other(v, v.bans[-1]["team_id"]), "side"
+
+
+def maps(v: Veto) -> list[dict]:
+    """The maps to play, in order: the picks, then the decider."""
+    out = [{"map": b["map"], "picked_by": b["team_id"], "side_team_id": b.get("side_team_id"), "side": b.get("side")}
+           for b in v.bans if b.get("kind") == "pick"]
+    if v.map:
+        out.append({"map": v.map, "picked_by": None, "side_team_id": v.side_team_id, "side": v.side})
+    return out
 
 
 # ---------- views
@@ -78,7 +115,10 @@ def view(v: Veto, teams: dict, you: int | None = None) -> dict:
     stand_in = {v.team_a_id: v.a_delegate, v.team_b_id: v.b_delegate}
     side = lambda tid: {**team_card(teams[tid][0]), "captain": teams[tid][1].display_name,  # noqa: E731
                         "delegate": stand_in.get(tid)} if tid in teams else None
-    return {"id": v.id, "status": v.status, "pool": v.pool, "remaining": remaining(v), "bans": v.bans,
+    steps = [{"kind": k, "team_id": step_team(v, i), "map": v.bans[i]["map"] if i < len(v.bans) else None}
+             for i, k in enumerate(plan(v))]
+    return {"id": v.id, "bo": v.bo, "steps": steps, "step": plan(v)[len(v.bans)] if v.status == "ban" else None,
+            "maps": maps(v), "status": v.status, "pool": v.pool, "remaining": remaining(v), "bans": v.bans,
             "call": v.call, "coin": v.coin, "first_team_id": v.first_team_id, "map": v.map,
             "side_team_id": v.side_team_id, "side": v.side, "turn": turn(v),
             "team_a": side(v.team_a_id), "team_b": side(v.team_b_id), "you": you,
@@ -144,7 +184,7 @@ async def get_veto(veto_id: int, request: Request, k: str = "", db: AsyncSession
 
 @router.post("/vetoes/{veto_id}/{action}")
 async def move(veto_id: int, action: str, body: dict, request: Request, k: str = "", db: AsyncSession = Depends(get_db)):
-    if action not in ("call", "ban", "side"):
+    if action not in ("call", "ban", "pick", "side"):
         raise HTTPException(404, "Unknown move")
     v = await db.scalar(select(Veto).where(Veto.id == veto_id).with_for_update())
     if not v:
@@ -187,16 +227,17 @@ async def create_veto(body: dict, db: AsyncSession = Depends(get_db), admin: str
     teams = await _teams(db)
     if a == b or a not in teams or b not in teams:
         raise HTTPException(422, "Pick two different approved teams")
-    if len(pool) < 2:
-        raise HTTPException(422, "Pick at least 2 maps for the pool")
+    bo = 3 if body.get("bo") == 3 else 1
+    if len(pool) < bo + 1:
+        raise HTTPException(422, f"Pick at least {bo + 1} maps for a BO{bo} pool")
     busy = await db.scalar(select(Veto.id).where(Veto.status.in_(LIVE), or_(
         Veto.team_a_id.in_((a, b)), Veto.team_b_id.in_((a, b)))))
     if busy:
         raise HTTPException(409, "One of these teams already has a veto going. Finish or delete it first.")
-    v = Veto(team_a_id=a, team_b_id=b, pool=pool, bans=[])
+    v = Veto(team_a_id=a, team_b_id=b, pool=pool, bans=[], bo=bo)
     db.add(v)
     await db.flush()
-    audit(db, admin, "veto.created", veto_id=v.id, team_a=a, team_b=b, pool=pool)
+    audit(db, admin, "veto.created", veto_id=v.id, team_a=a, team_b=b, pool=pool, bo=bo)
     await db.commit()
     return admin_view(v, teams)
 
